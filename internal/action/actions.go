@@ -929,6 +929,14 @@ func (h *BufPane) CycleAutocompleteBack() bool {
 	return false
 }
 
+// Insert inserts a string
+func (h *BufPane) Insert(text string) bool {
+	b := h.Buf
+	b.Insert(h.Cursor.Loc, text)
+	h.Relocate()
+	return true
+}
+
 // InsertTab inserts a tab or spaces
 func (h *BufPane) InsertTab() bool {
 	b := h.Buf

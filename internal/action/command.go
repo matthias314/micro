@@ -44,6 +44,7 @@ func InitCommands() {
 		"goto":       {(*BufPane).GotoCmd, nil},
 		"jump":       {(*BufPane).JumpCmd, nil},
 		"save":       {(*BufPane).SaveCmd, nil},
+		"insert":     {(*BufPane).InsertCmd, nil},
 		"replace":    {(*BufPane).ReplaceCmd, nil},
 		"replaceall": {(*BufPane).ReplaceAllCmd, nil},
 		"vsplit":     {(*BufPane).VSplitCmd, buffer.FileComplete},
@@ -890,6 +891,18 @@ func (h *BufPane) SaveCmd(args []string) {
 		h.Save()
 	} else {
 		h.Buf.SaveAs(args[0])
+	}
+}
+
+// InsertCmd inserts the argument into the buffer
+func (h *BufPane) InsertCmd(args []string) {
+	if len(args) == 1 {
+		for _, c := range h.Buf.GetCursors() {
+			h.Cursor = c
+			h.Insert(args[0])
+		}
+	} else {
+		InfoBar.Error("Only one argument allowed")
 	}
 }
 
