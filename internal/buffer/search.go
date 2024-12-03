@@ -107,6 +107,58 @@ func (b *Buffer) findUp(r *regexp.Regexp, start, end Loc) ([]Loc, bool) {
 	return []Loc{}, false
 }
 
+func (b *Buffer) findAll(r *regexp.Regexp, start, end Loc) [][]Loc {
+	lastcn := util.CharacterCount(b.LineBytes(b.LinesNum() - 1))
+	if start.Y > b.LinesNum()-1 {
+		start.X = lastcn - 1
+	}
+	if end.Y > b.LinesNum()-1 {
+		end.X = lastcn
+	}
+	start.Y = util.Clamp(start.Y, 0, b.LinesNum()-1)
+	end.Y = util.Clamp(end.Y, 0, b.LinesNum()-1)
+
+	if start.GreaterThan(end) {
+		start, end = end, start
+	}
+
+	locs := [][]Loc{}
+
+	for i := start.Y; i <= end.Y; i++ {
+		l := b.LineBytes(i)
+		charpos := 0
+
+		if i == start.Y && start.Y == end.Y {
+			nchars := util.CharacterCount(l)
+			start.X = util.Clamp(start.X, 0, nchars)
+			end.X = util.Clamp(end.X, 0, nchars)
+			l = util.SliceStart(l, end.X)
+			l = util.SliceEnd(l, start.X)
+			charpos = start.X
+		} else if i == start.Y {
+			nchars := util.CharacterCount(l)
+			start.X = util.Clamp(start.X, 0, nchars)
+			l = util.SliceEnd(l, start.X)
+			charpos = start.X
+		} else if i == end.Y {
+			nchars := util.CharacterCount(l)
+			end.X = util.Clamp(end.X, 0, nchars)
+			l = util.SliceStart(l, end.X)
+		}
+
+		matches := r.FindAllSubmatchIndex(l, -1)
+
+		for _, match := range matches {
+			loc := make([]Loc, len(match))
+			for j, x := range match {
+				loc[j] = Loc{charpos + util.RunePos(l, x), i}
+			}
+			locs = append(locs, loc)
+		}
+	}
+	return locs
+}
+
 // FindNextSubmatch finds the next occurrence of a given string in the
 // buffer. It returns the start and end location of the match and of
 // all submatches (if found) and a boolean indicating if it was found.
@@ -158,6 +210,31 @@ func (b *Buffer) FindNext(s string, start, end, from Loc, down bool, useRegex bo
 		return [2]Loc{l[0], l[1]}, found, err
 	} else {
 		return [2]Loc{}, found, err
+	}
+}
+
+// FindAllSubmatch finds all occurrences of a given string in the
+// buffer. It returns the start and end location of each match and of
+// all submatches (if found).
+// May also return an error if the search regex is invalid
+func (b *Buffer) FindAllSubmatch(s string, start, end Loc) ([][]Loc, error) {
+	if s == "" {
+		return [][]Loc{}, nil
+	}
+
+	var r *regexp.Regexp
+	var err error
+
+	if b.Settings["ignorecase"].(bool) {
+		r, err = regexp.Compile("(?i)" + s)
+	} else {
+		r, err = regexp.Compile(s)
+	}
+
+	if err != nil {
+		return [][]Loc{}, err
+	} else {
+		return b.findAll(r, start, end), nil
 	}
 }
 
