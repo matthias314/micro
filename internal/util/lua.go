@@ -18,6 +18,10 @@ func LuaRuneAt(str string, runeidx int) string {
 	return ""
 }
 
+func LuaSubstr(str string, start, end int) string {
+	return string([]rune(str)[start-1:end])
+}
+
 // LuaGetLeadingWhitespace returns the leading whitespace of a string (used by lua plugins)
 func LuaGetLeadingWhitespace(s string) string {
 	ws := []byte{}
