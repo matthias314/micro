@@ -164,10 +164,6 @@ func (b *Buffer) findAll(r *regexp.Regexp, start, end Loc) [][]Loc {
 // all submatches (if found) and a boolean indicating if it was found.
 // May also return an error if the search regex is invalid
 func (b *Buffer) FindNextSubmatch(s string, start, end, from Loc, down bool) ([]Loc, bool, error) {
-	if s == "" {
-		return []Loc{}, false, nil
-	}
-
 	var r *regexp.Regexp
 	var err error
 
