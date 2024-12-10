@@ -284,6 +284,7 @@ func NewBufPane(buf *buffer.Buffer, win display.BWindow, tab *Tab) *BufPane {
 func NewBufPaneFromBuf(buf *buffer.Buffer, tab *Tab) *BufPane {
 	w := display.NewBufWindow(0, 0, 0, 0, buf)
 	h := newBufPane(buf, w, tab)
+	h.BWindow.SetActive(false)
 	// Postpone finishing initializing the pane until we know the actual geometry
 	// of the buf window.
 	return h
@@ -666,7 +667,6 @@ func (h *BufPane) VSplitIndex(buf *buffer.Buffer, right bool) *BufPane {
 	}
 	MainTab().AddPane(e, currentPaneIdx)
 	MainTab().Resize()
-	MainTab().SetActive(currentPaneIdx)
 	return e
 }
 
@@ -680,18 +680,23 @@ func (h *BufPane) HSplitIndex(buf *buffer.Buffer, bottom bool) *BufPane {
 	}
 	MainTab().AddPane(e, currentPaneIdx)
 	MainTab().Resize()
-	MainTab().SetActive(currentPaneIdx)
 	return e
 }
 
 // VSplitBuf opens the given buffer in a new vertical split.
 func (h *BufPane) VSplitBuf(buf *buffer.Buffer) *BufPane {
-	return h.VSplitIndex(buf, h.Buf.Settings["splitright"].(bool))
+	e := h.VSplitIndex(buf, h.Buf.Settings["splitright"].(bool))
+	MainTab().SetActive(MainTab().GetPane(e.ID()))
+	e.SetActive(true)
+	return e
 }
 
 // HSplitBuf opens the given buffer in a new horizontal split.
 func (h *BufPane) HSplitBuf(buf *buffer.Buffer) *BufPane {
-	return h.HSplitIndex(buf, h.Buf.Settings["splitbottom"].(bool))
+	e := h.HSplitIndex(buf, h.Buf.Settings["splitbottom"].(bool))
+	MainTab().SetActive(MainTab().GetPane(e.ID()))
+	e.SetActive(true)
+	return e
 }
 
 // Close this pane.
