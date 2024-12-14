@@ -284,7 +284,6 @@ func NewBufPane(buf *buffer.Buffer, win display.BWindow, tab *Tab) *BufPane {
 func NewBufPaneFromBuf(buf *buffer.Buffer, tab *Tab) *BufPane {
 	w := display.NewBufWindow(0, 0, 0, 0, buf)
 	h := newBufPane(buf, w, tab)
-	h.BWindow.SetActive(false)
 	// Postpone finishing initializing the pane until we know the actual geometry
 	// of the buf window.
 	return h
