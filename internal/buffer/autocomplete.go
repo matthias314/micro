@@ -19,6 +19,10 @@ import (
 // other UI element
 type Completer func(*Buffer) ([]string, []string)
 
+func (b *Buffer) AddCompleter(c Completer) {
+	b.Completers = append(b.Completers, c)
+}
+
 func (b *Buffer) GetSuggestions() {
 
 }
@@ -153,6 +157,17 @@ func FileComplete(b *Buffer) ([]string, []string) {
 // BufferComplete autocompletes based on previous words in the buffer
 func BufferComplete(b *Buffer) ([]string, []string) {
 	c := b.GetActiveCursor()
+
+	if c.X == 0 {
+		return []string{}, []string{}
+	}
+	r := c.RuneUnder(c.X)
+	prev := c.RuneUnder(c.X - 1)
+	if !util.IsAutocomplete(prev) || util.IsWordChar(r) {
+		// don't autocomplete if cursor is within a word
+		return []string{}, []string{}
+	}
+
 	input, argstart := b.GetWord()
 
 	if argstart == -1 {

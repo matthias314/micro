@@ -209,6 +209,9 @@ type Buffer struct {
 	LastSearchRegex bool
 	// HighlightSearch enables highlighting all instances of the last successful search
 	HighlightSearch bool
+
+	// Completers stores the list of completer callback functions
+	Completers      []Completer
 }
 
 // NewBufferFromFileAtLoc opens a new buffer with a given cursor location
@@ -410,6 +413,8 @@ func NewBuffer(r io.Reader, size int64, path string, startcursor Loc, btype BufT
 
 	b.AddCursor(NewCursor(b, b.StartCursor))
 	b.GetActiveCursor().Relocate()
+
+	b.Completers = []Completer{BufferComplete}
 
 	if !b.Settings["fastdirty"].(bool) && !found {
 		if size > LargeFileThreshold {

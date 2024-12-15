@@ -909,23 +909,17 @@ func (h *BufPane) Autocomplete() bool {
 
 	if h.Cursor.HasSelection() {
 		return false
-	}
-
-	if h.Cursor.X == 0 {
-		return false
-	}
-	r := h.Cursor.RuneUnder(h.Cursor.X)
-	prev := h.Cursor.RuneUnder(h.Cursor.X - 1)
-	if !util.IsAutocomplete(prev) || util.IsWordChar(r) {
-		// don't autocomplete if cursor is within a word
-		return false
-	}
-
-	if b.HasSuggestions {
+	} else if b.HasSuggestions {
 		b.CycleAutocomplete(true)
 		return true
 	}
-	return b.Autocomplete(buffer.BufferComplete)
+
+	for i := len(b.Completers)-1; i >= 0; i-- {
+		if b.Autocomplete(b.Completers[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 // CycleAutocompleteBack cycles back in the autocomplete suggestion list
