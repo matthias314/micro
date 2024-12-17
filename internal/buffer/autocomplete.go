@@ -157,24 +157,15 @@ func FileComplete(b *Buffer) ([]string, []string) {
 // BufferComplete autocompletes based on previous words in the buffer
 func BufferComplete(b *Buffer) ([]string, []string) {
 	c := b.GetActiveCursor()
-
-	if c.X == 0 {
-		return []string{}, []string{}
-	}
 	r := c.RuneUnder(c.X)
-	prev := c.RuneUnder(c.X - 1)
-	if !util.IsAutocomplete(prev) || util.IsWordChar(r) {
-		// don't autocomplete if cursor is within a word
-		return []string{}, []string{}
-	}
-
 	input, argstart := b.GetWord()
+	inputLen := util.CharacterCount(input)
 
-	if argstart == -1 {
+	if argstart == -1 || util.IsWordChar(r) || (inputLen == 0 && c.RuneUnder(c.X-1) != '.') {
+		// don't autocomplete at beginning of line, if cursor is within a word
+		// or if input is empty (unless it is preceded by a '.')
 		return []string{}, []string{}
 	}
-
-	inputLen := util.CharacterCount(input)
 
 	suggestionsSet := make(map[string]struct{})
 

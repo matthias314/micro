@@ -493,11 +493,6 @@ func Clamp(val, min, max int) int {
 	return val
 }
 
-// IsAutocomplete returns whether a character should begin an autocompletion.
-func IsAutocomplete(c rune) bool {
-	return c == '.' || IsWordChar(c)
-}
-
 // String converts a byte array to a string (for lua plugins)
 func String(s []byte) string {
 	return string(s)
