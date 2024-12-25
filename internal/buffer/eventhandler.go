@@ -115,6 +115,15 @@ func (eh *EventHandler) DoTextEvent(t *TextEvent, useUndo bool) {
 // ExecuteTextEvent runs a text event
 // The deltas are processed in reverse order and afterwards reversed
 func ExecuteTextEvent(t *TextEvent, buf *SharedBuffer) {
+	b, err := config.RunPluginFnBool(nil, "onBeforeTextEvent", luar.New(ulua.L, buf), luar.New(ulua.L, t))
+	if err != nil {
+		screen.TermMessage(err)
+	}
+
+	if !b {
+		return
+	}
+
 	for i := len(t.Deltas) - 1; i >= 0; i-- {
 		d := t.Deltas[i]
 		if t.EventType == TextEventInsert {
@@ -239,15 +248,6 @@ func (eh *EventHandler) Execute(t *TextEvent) {
 		eh.RedoStack = new(TEStack)
 	}
 	eh.UndoStack.Push(t)
-
-	b, err := config.RunPluginFnBool(nil, "onBeforeTextEvent", luar.New(ulua.L, eh.buf), luar.New(ulua.L, t))
-	if err != nil {
-		screen.TermMessage(err)
-	}
-
-	if !b {
-		return
-	}
 
 	ExecuteTextEvent(t, eh.buf)
 }
