@@ -28,7 +28,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.1.0 // indirect
-	github.com/xo/terminfo v0.0.0-20200218205459-454e5b68f9e8 // indirect
 	github.com/zyedidia/poller v1.0.1 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 )
@@ -38,5 +37,7 @@ replace github.com/kballard/go-shellquote => github.com/zyedidia/go-shellquote v
 replace github.com/mattn/go-runewidth => github.com/zyedidia/go-runewidth v0.0.12
 
 replace layeh.com/gopher-luar v1.0.11 => github.com/layeh/gopher-luar v1.0.11
+
+replace github.com/zyedidia/tcell/v2 v2.0.10 => github.com/matthias314/tcell/v2 v2.0.0-20250102004328-bce68f96621e
 
 go 1.17
