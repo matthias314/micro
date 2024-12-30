@@ -24,6 +24,8 @@ github.com/layeh/gopher-luar v1.0.11 h1:ss6t9OtykOiETBScJylSMPhuYAtOmpH5rSX10/wC
 github.com/layeh/gopher-luar v1.0.11/go.mod h1:TPnIVCZ2RJBndm7ohXyaqfhzjlZ+OA2SZR/YwL8tECk=
 github.com/lucasb-eyer/go-colorful v1.0.3 h1:QIbQXiugsb+q10B+MI+7DI1oQLdmnep86tWFlaaUAac=
 github.com/lucasb-eyer/go-colorful v1.0.3/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
+github.com/matthias314/tcell/v2 v2.0.0-20250106013510-20827da2c2fe h1:vXKSqn7RVq34UOfi6ozt4rT8jHe1Y4PrWO6JJBzLaDg=
+github.com/matthias314/tcell/v2 v2.0.0-20250106013510-20827da2c2fe/go.mod h1:kVYk6NOwYJrboL/7IA7cCupk4o2NzyF/0UMLjeEJN/s=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-runewidth v0.0.7/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
@@ -33,8 +35,6 @@ github.com/micro-editor/go-shellquote v0.0.0-20250101105543-feb6c39314f5 h1:D7BP
 github.com/micro-editor/go-shellquote v0.0.0-20250101105543-feb6c39314f5/go.mod h1:zaPgW/fDiW4MUfEwxpC+GB/bhvX44NJaNHmRAC9auHQ=
 github.com/micro-editor/json5 v1.0.1-micro h1:5Y4MuzhkmW0sQQNPvrIVevIOKi557qsznwjRr4iq1AI=
 github.com/micro-editor/json5 v1.0.1-micro/go.mod h1:cmlPHZ1JKOXNse0/3zwwKj/GUpzAVkzx4lZDkpHl4q0=
-github.com/micro-editor/tcell/v2 v2.0.11 h1:USjdpBSmbocx2yPARbY19KcUSj+ZerScrdmBqGjzoX4=
-github.com/micro-editor/tcell/v2 v2.0.11/go.mod h1:kVYk6NOwYJrboL/7IA7cCupk4o2NzyF/0UMLjeEJN/s=
 github.com/micro-editor/terminal v0.0.0-20250105114944-ffd0fc59e777 h1:ddEDJwVqnxd8Yxtr6ZlUBBH3Kyf90jLHMJAbmU1bjuA=
 github.com/micro-editor/terminal v0.0.0-20250105114944-ffd0fc59e777/go.mod h1:soCc8JsxxfCZd3y08pX67F16Bni5L/xtcAnqEswzs44=
 github.com/mitchellh/go-homedir v1.1.0 h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=
