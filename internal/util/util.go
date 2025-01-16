@@ -320,6 +320,25 @@ func RunePos(b []byte, i int) int {
 	return CharacterCount(b[:i])
 }
 
+// IndexAnyUnquoted returns the first position is s of a character from chars.
+// Escaped (with '\\') and quoted (with single or double quotes) characters
+// are ignored. Returns -1 if not successful
+func IndexAnyUnquoted(s, chars string) int {
+	var q byte = 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++
+		} else if s[i] == q {
+			q = 0
+		} else if q == 0 && (s[i] == '\'' || s[i] == '"') {
+			q = s[i]
+		} else if q == 0 && strings.IndexByte(chars, s[i]) >= 0 {
+			return i
+		}
+	}
+	return -1
+}
+
 // MakeRelative will attempt to make a relative path between path and base
 func MakeRelative(path, base string) (string, error) {
 	if len(path) > 0 {
