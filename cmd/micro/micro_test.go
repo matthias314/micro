@@ -12,7 +12,7 @@ import (
 	"github.com/zyedidia/micro/v2/internal/buffer"
 	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/screen"
-	"github.com/zyedidia/tcell/v2"
+	"github.com/micro-editor/tcell/v2"
 )
 
 var tempDir string
@@ -83,8 +83,8 @@ func startup(args []string) (tcell.SimulationScreen, error) {
 		return nil, errors.New("No buffers opened")
 	}
 
-	action.InitTabs(b)
 	action.InitGlobals()
+	action.InitTabs(b)
 
 	err = config.RunPluginFn("init")
 	if err != nil {

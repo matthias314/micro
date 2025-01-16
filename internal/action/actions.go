@@ -18,7 +18,7 @@ import (
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/shell"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/zyedidia/tcell/v2"
+	"github.com/micro-editor/tcell/v2"
 )
 
 // ScrollUp is not an action
@@ -1911,6 +1911,9 @@ func (h *BufPane) ForceQuit() bool {
 		h.Unsplit()
 	} else if len(Tabs.List) > 1 {
 		Tabs.RemoveTab(h.splitID)
+		if e := MainTab().CurPane(); e != nil { // e == nil for 'raw' tab
+			e.SetActive(true)
+		}
 	} else {
 		screen.Screen.Fini()
 		InfoBar.Close()
