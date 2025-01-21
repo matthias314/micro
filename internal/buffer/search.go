@@ -108,10 +108,6 @@ func (b *Buffer) findUp(r *regexp.Regexp, start, end Loc) ([2]Loc, bool) {
 // a boolean indicating if it was found
 // May also return an error if the search regex is invalid
 func (b *Buffer) FindNext(s string, start, end, from Loc, down bool, useRegex bool) ([2]Loc, bool, error) {
-	if s == "" {
-		return [2]Loc{}, false, nil
-	}
-
 	var r *regexp.Regexp
 	var err error
 
