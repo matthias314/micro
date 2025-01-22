@@ -13,7 +13,7 @@ import (
 	ulua "github.com/zyedidia/micro/v2/internal/lua"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/zyedidia/tcell/v2"
+	"github.com/micro-editor/tcell/v2"
 )
 
 type BufAction interface{}
@@ -100,9 +100,7 @@ func BufMapEvent(k Event, action string) {
 			break
 		}
 
-		// TODO: fix problem when complex bindings have these
-		// characters (escape them?)
-		idx := strings.IndexAny(action, "&|,")
+		idx := util.IndexAnyUnquoted(action, "&|,")
 		a := action
 		if idx >= 0 {
 			a = action[:idx]
@@ -666,7 +664,6 @@ func (h *BufPane) VSplitIndex(buf *buffer.Buffer, right bool) *BufPane {
 	}
 	MainTab().AddPane(e, currentPaneIdx)
 	MainTab().Resize()
-	MainTab().SetActive(currentPaneIdx)
 	return e
 }
 
@@ -680,18 +677,23 @@ func (h *BufPane) HSplitIndex(buf *buffer.Buffer, bottom bool) *BufPane {
 	}
 	MainTab().AddPane(e, currentPaneIdx)
 	MainTab().Resize()
-	MainTab().SetActive(currentPaneIdx)
 	return e
 }
 
 // VSplitBuf opens the given buffer in a new vertical split.
 func (h *BufPane) VSplitBuf(buf *buffer.Buffer) *BufPane {
-	return h.VSplitIndex(buf, h.Buf.Settings["splitright"].(bool))
+	e := h.VSplitIndex(buf, h.Buf.Settings["splitright"].(bool))
+	MainTab().SetActive(MainTab().GetPane(e.ID()))
+	e.SetActive(true)
+	return e
 }
 
 // HSplitBuf opens the given buffer in a new horizontal split.
 func (h *BufPane) HSplitBuf(buf *buffer.Buffer) *BufPane {
-	return h.HSplitIndex(buf, h.Buf.Settings["splitbottom"].(bool))
+	e := h.HSplitIndex(buf, h.Buf.Settings["splitbottom"].(bool))
+	MainTab().SetActive(MainTab().GetPane(e.ID()))
+	e.SetActive(true)
+	return e
 }
 
 // Close this pane.

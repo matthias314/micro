@@ -57,15 +57,17 @@ that micro defines:
 
 * `deinit()`: cleanup function called when your plugin is unloaded or reloaded.
 
-* `onSetActive(bufpane)`: runs when changing the currently active panel.
-
 * `onBufferOpen(buf)`: runs when a buffer is opened. The input contains
    the buffer object.
+
+* `onBufferOptionChanged(buf, option, old, new)`: runs when an option of the
+   buffer has changed. The input contains the buffer object, the option name,
+   the old and the new value.
 
 * `onBufPaneOpen(bufpane)`: runs when a bufpane is opened. The input
    contains the bufpane object.
 
-* `onSetActive(bufpane)`: runs when changing the currently active bufpane.
+* `onSetActive(bufpane)`: runs when a bufpane becomes active.
 
 * `onAction(bufpane)`: runs when `Action` is triggered by the user, where
    `Action` is a bindable action (see `> help keybindings`). A bufpane
