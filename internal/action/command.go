@@ -960,22 +960,12 @@ func (h *BufPane) ReplaceCmd(args []string) {
 	if all {
 		nreplaced, _ = h.Buf.ReplaceRegex(start, end, regex, replace, !noRegex)
 	} else {
-		inRange := func(l buffer.Loc) bool {
-			return l.GreaterEqual(start) && l.LessEqual(end)
-		}
-
 		lastMatchEnd := buffer.Loc{-1, -1}
 		var doReplacement func()
 		doReplacement = func() {
-			locs, found, err := h.Buf.FindNext(search, start, end, searchLoc, true, true)
-			if err != nil {
-				InfoBar.Error(err)
-				return
-			}
-			if !found || !inRange(locs[0]) || !inRange(locs[1]) {
+			locs, found, _ := h.Buf.FindNext(search, start, end, searchLoc, true, true)
+			if !found {
 				h.Cursor.ResetSelection()
-				h.Buf.RelocateCursors()
-
 				return
 			}
 
@@ -999,22 +989,20 @@ func (h *BufPane) ReplaceCmd(args []string) {
 			h.Buf.HighlightSearch = h.Buf.Settings["hlsearch"].(bool)
 
 			InfoBar.YNPrompt("Perform replacement (y,n,esc)", func(yes, canceled bool) {
-				if !canceled && yes {
-					_, nrunes := h.Buf.ReplaceRegex(locs[0], locs[1], regex, replace, !noRegex)
+				if canceled {
+					h.Cursor.ResetSelection()
+					return
+				} else if yes {
+					_, deltaX := h.Buf.ReplaceRegex(locs[0], locs[1], regex, replace, !noRegex)
 
-					searchLoc = locs[0]
-					searchLoc.X += nrunes + locs[0].Diff(locs[1], h.Buf)
+					searchLoc = locs[1].Move(deltaX, h.Buf)
 					if end.Y == locs[1].Y {
-						end = end.Move(nrunes, h.Buf)
+						end = end.Move(deltaX, h.Buf)
 					}
 					h.Cursor.Loc = searchLoc
 					nreplaced++
-				} else if !canceled && !yes {
+				} else {
 					searchLoc = locs[1]
-				} else if canceled {
-					h.Cursor.ResetSelection()
-					h.Buf.RelocateCursors()
-					return
 				}
 				lastMatchEnd = searchLoc
 				doReplacement()
