@@ -982,11 +982,16 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		nreplaced, _ = h.Buf.ReplaceRegex(start, end, regex, replace, !noRegex)
 		finishReplace()
 	} else {
+		searchLoc0 := searchLoc
 		lastMatchEnd := buffer.Loc{-1, -1}
 		var doReplacement func()
 		doReplacement = func() {
 			locs, found, _ := h.Buf.FindNext(search, start, end, searchLoc, true, true)
-			if !found {
+			if !found ||
+				// Are we about to iterate over the search region a second time?
+				(searchLoc0.LessEqual(locs[0]) && searchLoc.GreaterThan(locs[0])) ||
+				(searchLoc.LessThan(searchLoc0) && searchLoc0.LessEqual(locs[0])) ||
+				(searchLoc.LessThan(searchLoc0) && searchLoc.GreaterThan(locs[0])) {
 				h.Cursor.ResetSelection()
 				finishReplace()
 				return
@@ -1022,6 +1027,12 @@ func (h *BufPane) ReplaceCmd(args []string) {
 					searchLoc = locs[1].Move(deltaX, h.Buf)
 					if end.Y == locs[1].Y {
 						end = end.Move(deltaX, h.Buf)
+					}
+					if searchLoc0.GreaterThan(locs[0]) && searchLoc0.LessEqual(locs[1]) {
+						h.Cursor.ResetSelection()
+						return
+					} else if searchLoc0.Y == locs[1].Y && searchLoc0.X >= locs[1].X {
+						searchLoc0 = searchLoc0.Move(deltaX, h.Buf)
 					}
 					h.Cursor.Loc = searchLoc
 					nreplaced++
