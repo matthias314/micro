@@ -957,8 +957,30 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		end = h.Cursor.CurSelection[1]
 		searchLoc = start // otherwise me might start at the end
 	}
+
+	finishReplace := func() {
+		h.Buf.RelocateCursors()
+		h.Relocate()
+
+		var s string
+		if nreplaced > 1 {
+			s = fmt.Sprintf("Replaced %d occurrences of %s", nreplaced, search)
+		} else if nreplaced == 1 {
+			s = fmt.Sprintf("Replaced 1 occurrence of %s", search)
+		} else {
+			s = fmt.Sprintf("Nothing matched %s", search)
+		}
+
+		if selection {
+			s += " in selection"
+		}
+
+		InfoBar.Message(s)
+	}
+
 	if all {
 		nreplaced, _ = h.Buf.ReplaceRegex(start, end, regex, replace, !noRegex)
+		finishReplace()
 	} else {
 		lastMatchEnd := buffer.Loc{-1, -1}
 		var doReplacement func()
@@ -966,6 +988,7 @@ func (h *BufPane) ReplaceCmd(args []string) {
 			locs, found, _ := h.Buf.FindNext(search, start, end, searchLoc, true, true)
 			if !found {
 				h.Cursor.ResetSelection()
+				finishReplace()
 				return
 			}
 
@@ -991,6 +1014,7 @@ func (h *BufPane) ReplaceCmd(args []string) {
 			InfoBar.YNPrompt("Perform replacement (y,n,esc)", func(yes, canceled bool) {
 				if canceled {
 					h.Cursor.ResetSelection()
+					finishReplace()
 					return
 				} else if yes {
 					_, deltaX := h.Buf.ReplaceRegex(locs[0], locs[1], regex, replace, !noRegex)
@@ -1010,24 +1034,6 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		}
 		doReplacement()
 	}
-
-	h.Buf.RelocateCursors()
-	h.Relocate()
-
-	var s string
-	if nreplaced > 1 {
-		s = fmt.Sprintf("Replaced %d occurrences of %s", nreplaced, search)
-	} else if nreplaced == 1 {
-		s = fmt.Sprintf("Replaced 1 occurrence of %s", search)
-	} else {
-		s = fmt.Sprintf("Nothing matched %s", search)
-	}
-
-	if selection {
-		s += " in selection"
-	}
-
-	InfoBar.Message(s)
 }
 
 // ReplaceAllCmd replaces search term all at once
