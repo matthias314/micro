@@ -104,29 +104,33 @@ func (b *Buffer) findUp(r *regexp.Regexp, start, end Loc) ([2]Loc, bool) {
 		start, end = end, start
 	}
 
+	var match [2]Loc
 	for i := end.Y; i >= start.Y; i-- {
 		charCount := util.CharacterCount(b.LineBytes(i))
 		from := Loc{0, i}.Clamp(start, end)
 		to := Loc{charCount, i}.Clamp(start, end)
 
-		allMatches := b.findAll(r, from, to)
-		if allMatches != nil {
-			match := allMatches[len(allMatches)-1]
-			return [2]Loc{match[0], match[1]}, true
+		n := b.findAllFunc(r, from, to, func(from, to Loc) {
+			match = [2]Loc{from, to}
+		})
+
+		if n != 0 {
+			return match, true
 		}
 	}
-	return [2]Loc{}, false
+	return match, false
 }
 
-func (b *Buffer) findAll(r *regexp.Regexp, start, end Loc) [][2]Loc {
-	var matches [][2]Loc
+func (b *Buffer) findAllFunc(r *regexp.Regexp, start, end Loc, f func(from, to Loc)) int {
 	loc := start
+	nfound := 0
 	for {
 		match, found := b.findDown(r, loc, end)
 		if !found {
 			break
 		}
-		matches = append(matches, match)
+		nfound++
+		f(match[0], match[1])
 		if match[0] != match[1] {
 			loc = match[1]
 		} else if match[1] != end {
@@ -135,7 +139,7 @@ func (b *Buffer) findAll(r *regexp.Regexp, start, end Loc) [][2]Loc {
 			break
 		}
 	}
-	return matches
+	return nfound
 }
 
 // FindNext finds the next occurrence of a given string in the buffer
@@ -189,50 +193,19 @@ func (b *Buffer) ReplaceRegex(start, end Loc, search *regexp.Regexp, replace []b
 	}
 
 	charsEnd := util.CharacterCount(b.LineBytes(end.Y))
-	found := 0
+
 	var deltas []Delta
-
-	for i := start.Y; i <= end.Y; i++ {
-		l := b.LineBytes(i)
-		charCount := util.CharacterCount(l)
-		if (i == start.Y && start.X > 0) || (i == end.Y && end.X < charCount) {
-			// This replacement code works in general, but it creates a separate
-			// modification for each match. We only use it for the first and last
-			// lines, which may use padded regexps
-
-			from := Loc{0, i}.Clamp(start, end)
-			to := Loc{charCount, i}.Clamp(start, end)
-			matches := b.findAll(search, from, to)
-			found += len(matches)
-
-			for j := len(matches) - 1; j >= 0; j-- {
-				// if we counted upwards, the different deltas would interfere
-				match := matches[j]
-				var newText []byte
-				if captureGroups {
-					newText = search.ReplaceAll(b.Substr(match[0], match[1]), replace)
-				} else {
-					newText = replace
-				}
-				deltas = append(deltas, Delta{newText, match[0], match[1]})
-			}
+	nfound := b.findAllFunc(search, start, end, func(from, to Loc) {
+		var newText []byte
+		if captureGroups {
+			newText = search.ReplaceAll(b.Substr(from, to), replace)
 		} else {
-			newLine := search.ReplaceAllFunc(l, func(in []byte) []byte {
-				found++
-				var result []byte
-				if captureGroups {
-					match := search.FindSubmatchIndex(in)
-					result = search.Expand(result, replace, in, match)
-				} else {
-					result = replace
-				}
-				return result
-			})
-			deltas = append(deltas, Delta{newLine, Loc{0, i}, Loc{charCount, i}})
+			newText = replace
 		}
-	}
-
+		deltas = append(deltas, Delta{newText, from, to})
+	})
 	b.MultipleReplace(deltas)
 
-	return found, util.CharacterCount(b.LineBytes(end.Y)) - charsEnd
+	deltaX := util.CharacterCount(b.LineBytes(end.Y)) - charsEnd
+	return nfound, deltaX
 }
