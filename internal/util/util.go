@@ -328,12 +328,6 @@ func IsBytesWhitespace(b []byte) bool {
 	return true
 }
 
-// RunePos returns the rune index of a given byte index
-// Make sure the byte index is not between code points
-func RunePos(b []byte, i int) int {
-	return CharacterCount(b[:i])
-}
-
 // IndexAnyUnquoted returns the first position in s of a character from chars.
 // Escaped (with backslash) and quoted (with single or double quotes) characters
 // are ignored. Returns -1 if not successful
