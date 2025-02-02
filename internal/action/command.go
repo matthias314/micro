@@ -935,12 +935,12 @@ func (h *BufPane) ReplaceCmd(args []string) {
 
 	replace := []byte(replaceStr)
 
-	var regex *regexp.Regexp
+	var regex buffer.RegexpGroup
 	var err error
 	if h.Buf.Settings["ignorecase"].(bool) {
-		regex, err = regexp.Compile("(?im)" + search)
+		regex, err = buffer.NewRegexpGroup("(?i)" + search)
 	} else {
-		regex, err = regexp.Compile("(?m)" + search)
+		regex, err = buffer.NewRegexpGroup(search)
 	}
 	if err != nil {
 		// There was an error with the user's regex
