@@ -21,15 +21,15 @@ const (
 
 // NewRegexpGroup creates a RegexpGroup from a string
 func NewRegexpGroup(s string) (RegexpGroup, error) {
-	var r RegexpGroup
+	var rgrp RegexpGroup
 	var err error
-	r[0], err = regexp.Compile(s)
+	rgrp[0], err = regexp.Compile(s)
 	if err == nil {
-		r[padStart] = regexp.MustCompile(".(?:" + s + ")")
-		r[padEnd] = regexp.MustCompile("(?:" + s + ").")
-		r[padStart|padEnd] = regexp.MustCompile(".(?:" + s + ").")
+		rgrp[padStart] = regexp.MustCompile(".(?:" + s + ")")
+		rgrp[padEnd] = regexp.MustCompile("(?:" + s + ").")
+		rgrp[padStart|padEnd] = regexp.MustCompile(".(?:" + s + ").")
 	}
-	return r, err
+	return rgrp, err
 }
 
 func findLineParams(b *Buffer, start, end Loc, i int) ([]byte, int, int) {
@@ -59,7 +59,9 @@ func findLineParams(b *Buffer, start, end Loc, i int) ([]byte, int, int) {
 	return l, charpos, padMode
 }
 
-func (b *Buffer) findDown(r RegexpGroup, start, end Loc) ([2]Loc, bool) {
+type bytesFind func(*regexp.Regexp, []byte) []int
+
+func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) []Loc {
 	lastcn := util.CharacterCount(b.LineBytes(b.LinesNum() - 1))
 	if start.Y > b.LinesNum()-1 {
 		start.X = lastcn - 1
@@ -77,7 +79,7 @@ func (b *Buffer) findDown(r RegexpGroup, start, end Loc) ([2]Loc, bool) {
 	for i := start.Y; i <= end.Y; i++ {
 		l, charpos, padMode := findLineParams(b, start, end, i)
 
-		match := r[padMode].FindIndex(l)
+		match := find(rgrp[padMode], l)
 
 		if match != nil {
 			if padMode&padStart != 0 {
@@ -88,15 +90,36 @@ func (b *Buffer) findDown(r RegexpGroup, start, end Loc) ([2]Loc, bool) {
 				_, size := utf8.DecodeLastRune(l[:match[1]])
 				match[1] -= size
 			}
-			start := Loc{charpos + util.RunePos(l, match[0]), i}
-			end := Loc{charpos + util.RunePos(l, match[1]), i}
-			return [2]Loc{start, end}, true
+			return util.SliceMap(match, func(pos int) Loc {
+				if pos >= 0 {
+					return Loc{charpos + util.RunePos(l, pos), i}
+				} else { // unused submatches
+					return Loc{-1, -1}
+				}
+			})
 		}
 	}
-	return [2]Loc{}, false
+	return nil
 }
 
-func (b *Buffer) findUp(r RegexpGroup, start, end Loc) ([2]Loc, bool) {
+type bufferFind func(*Buffer, RegexpGroup, Loc, Loc) []Loc
+
+// FindDown returns a slice containing the start and end positions
+// of the first match of `rgrp` between `start` and `end`, or nil
+// if no match exists.
+func (b *Buffer) FindDown(rgrp RegexpGroup, start, end Loc) []Loc {
+	return b.findDownFunc(rgrp, start, end, (*regexp.Regexp).FindIndex)
+}
+
+// FindDownSubmatch returns a slice containing the start and end positions
+// of the first match of `rgrp` between `start` and `end` plus those
+// of all submatches (capturing groups), or nil if no match exists.
+// The start and end positions of an unused submatch are `Loc{-1, -1}`.
+func (b *Buffer) FindDownSubmatch(rgrp RegexpGroup, start, end Loc) []Loc {
+	return b.findDownFunc(rgrp, start, end, (*regexp.Regexp).FindSubmatchIndex)
+}
+
+func (b *Buffer) findUpFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) []Loc {
 	lastcn := util.CharacterCount(b.LineBytes(b.LinesNum() - 1))
 	if start.Y > b.LinesNum()-1 {
 		start.X = lastcn - 1
@@ -111,33 +134,64 @@ func (b *Buffer) findUp(r RegexpGroup, start, end Loc) ([2]Loc, bool) {
 		start, end = end, start
 	}
 
-	var match [2]Loc
+	var locs []Loc
 	for i := end.Y; i >= start.Y; i-- {
 		charCount := util.CharacterCount(b.LineBytes(i))
 		from := Loc{0, i}.Clamp(start, end)
 		to := Loc{charCount, i}.Clamp(start, end)
 
-		n := b.findAllFunc(r, from, to, func(from, to Loc) {
-			match = [2]Loc{from, to}
+		b.findAllFuncFunc(rgrp, from, to, func(b *Buffer, rgrp RegexpGroup, start, end Loc) []Loc {
+			return b.findDownFunc(rgrp, start, end, find)
+		}, func(match []Loc) {
+			locs = match
 		})
 
-		if n != 0 {
-			return match, true
+		if locs != nil {
+			return locs
 		}
 	}
-	return match, false
+	return nil
 }
 
-func (b *Buffer) findAllFunc(r RegexpGroup, start, end Loc, f func(from, to Loc)) int {
+// FindUp returns a slice containing the start and end positions
+// of the last match of `rgrp` between `start` and `end`, or nil
+// if no match exists.
+func (b *Buffer) FindUp(rgrp RegexpGroup, start, end Loc) []Loc {
+	return b.findUpFunc(rgrp, start, end, func(re *regexp.Regexp, l []byte) []int {
+		allMatches := re.FindAllIndex(l, -1)
+		if allMatches != nil {
+			return allMatches[len(allMatches)-1]
+		} else {
+			return nil
+		}
+	})
+}
+
+// FindUpSubmatch returns a slice containing the start and end positions
+// of the last match of `rgrp` between `start` and `end` plus those
+// of all submatches (capturing groups), or nil if no match exists.
+// The start and end positions of an unused submatch are `Loc{-1, -1}`.
+func (b *Buffer) FindUpSubmatch(rgrp RegexpGroup, start, end Loc) []Loc {
+	return b.findUpFunc(rgrp, start, end, func(re *regexp.Regexp, l []byte) []int {
+		allMatches := re.FindAllSubmatchIndex(l, -1)
+		if allMatches != nil {
+			return allMatches[len(allMatches)-1]
+		} else {
+			return nil
+		}
+	})
+}
+
+func (b *Buffer) findAllFuncFunc(r RegexpGroup, start, end Loc, find bufferFind, f func([]Loc)) int {
+	n := 0
 	loc := start
-	nfound := 0
 	for {
-		match, found := b.findDown(r, loc, end)
-		if !found {
+		match := find(b, r, loc, end)
+		if match == nil {
 			break
 		}
-		nfound++
-		f(match[0], match[1])
+		n++
+		f(match)
 		if match[0] != match[1] {
 			loc = match[1]
 		} else if match[1] != end {
@@ -146,7 +200,58 @@ func (b *Buffer) findAllFunc(r RegexpGroup, start, end Loc, f func(from, to Loc)
 			break
 		}
 	}
-	return nfound
+	return n
+}
+
+// FindAllFunc calls the function `f` once for each match between `start`
+// and `end` of the regexp given by `s`. The argument of `f` is the slice
+// containing the start and end positions of the match. FindAllFunc returns
+// the number of matches plus any error that occured when compiling the regexp.
+func (b *Buffer) FindAllFunc(s string, start, end Loc, f func([]Loc)) (int, error) {
+	rgrp, err := NewRegexpGroup(s)
+	if err == nil {
+		return b.findAllFuncFunc(rgrp, start, end, (*Buffer).FindDown, f), nil
+	} else {
+		return -1, err
+	}
+}
+
+// FindAll returns a slice containing the start and end positions of all
+// matches between `start` and `end` of the regexp given by `s`, plus any
+// error that occured when compiling the regexp. If no match is found, the
+// slice returned is nil.
+func (b *Buffer) FindAll(s string, start, end Loc) ([][]Loc, error) {
+	var matches [][]Loc
+	_, err := b.FindAllFunc(s, start, end, func(match []Loc) {
+		matches = append(matches, match)
+	})
+	return matches, err
+}
+
+// FindAllSubmatchFunc calls the function `f` once for each match between
+// `start` and `end` of the regexp given by `s`. The argument of `f` is the
+// slice containing the start and end positions of the match and all submatches
+// (capturing groups). FindAllSubmatch Func returns the number of matches plus
+// any error that occured when compiling the regexp.
+func (b *Buffer) FindAllSubmatchFunc(s string, start, end Loc, f func([]Loc)) (int, error) {
+	rgrp, err := NewRegexpGroup(s)
+	if err == nil {
+		return b.findAllFuncFunc(rgrp, start, end, (*Buffer).FindDownSubmatch, f), nil
+	} else {
+		return -1, err
+	}
+}
+
+// FindAllSubmatch returns a slice containing the start and end positions of
+// all matches and all submatches (capturing groups) between `start` and `end`
+// of the regexp given by `s`, plus any error that occured when compiling
+// the regexp. If no match is found, the slice returned is nil.
+func (b *Buffer) FindAllSubmatch(s string, start, end Loc) ([][]Loc, error) {
+	var matches [][]Loc
+	_, err := b.FindAllSubmatchFunc(s, start, end, func(match []Loc) {
+		matches = append(matches, match)
+	})
+	return matches, err
 }
 
 // FindNext finds the next occurrence of a given string in the buffer
@@ -166,49 +271,65 @@ func (b *Buffer) FindNext(s string, start, end, from Loc, down bool, useRegex bo
 		s = "(?i)" + s
 	}
 
-	r, err := NewRegexpGroup(s)
+	rgrp, err := NewRegexpGroup(s)
 	if err != nil {
 		return [2]Loc{}, false, err
 	}
 
-	var found bool
-	var l [2]Loc
+	var match []Loc
 	if down {
-		l, found = b.findDown(r, from, end)
-		if !found {
-			l, found = b.findDown(r, start, end)
+		match = b.FindDown(rgrp, from, end)
+		if match == nil {
+			match = b.FindDown(rgrp, start, end)
 		}
 	} else {
-		l, found = b.findUp(r, from, start)
-		if !found {
-			l, found = b.findUp(r, end, start)
+		match = b.FindUp(rgrp, from, start)
+		if match == nil {
+			match = b.FindUp(rgrp, end, start)
 		}
 	}
-	return l, found, nil
+	if match != nil {
+		return [2]Loc{match[0], match[1]}, true, nil
+	} else {
+		return [2]Loc{}, false, nil
+	}
 }
 
-// ReplaceRegex replaces all occurrences of 'search' with 'replace' in the given area
-// and returns the number of replacements made and the number of characters
-// added or removed on the last line of the range
-func (b *Buffer) ReplaceRegex(start, end Loc, search RegexpGroup, replace []byte, captureGroups bool) (int, int) {
+// ReplaceAll replaces all matches of 's' with 'template' in the given area
+// and returns the number of replacements made, the new end position and any
+// error that occured during regexp compilation
+func (b *Buffer) ReplaceAll(s string, start, end Loc, template string) (int, Loc, error) {
+	rgrp, err := NewRegexpGroup(s)
+	if err != nil {
+		return -1, Loc{-1, -1}, err
+	}
+
 	if start.GreaterThan(end) {
 		start, end = end, start
 	}
 
+	templateBytes := []byte(template)
 	charsEnd := util.CharacterCount(b.LineBytes(end.Y))
 
 	var deltas []Delta
-	nfound := b.findAllFunc(search, start, end, func(from, to Loc) {
-		var newText []byte
-		if captureGroups {
-			newText = search[0].ReplaceAll(b.Substr(from, to), replace)
-		} else {
-			newText = replace
-		}
-		deltas = append(deltas, Delta{newText, from, to})
-	})
+	var replace []byte
+
+	f := func(match []Loc) {
+		deltas = append(deltas, Delta{replace, match[0], match[1]})
+	}
+
+	n := b.findAllFuncFunc(rgrp, start, end, func(b *Buffer, r RegexpGroup, start, end Loc) []Loc {
+		return b.findDownFunc(r, start, end, func(re *regexp.Regexp, l []byte) []int {
+			match := re.FindSubmatchIndex(l)
+			if match == nil {
+				return nil
+			}
+			replace = re.Expand(nil, templateBytes, l, match)
+			return match[:2] // this way match[2:] is not transformed to Loc's
+		})
+	}, f)
 	b.MultipleReplace(deltas)
 
 	deltaX := util.CharacterCount(b.LineBytes(end.Y)) - charsEnd
-	return nfound, deltaX
+	return n, Loc{end.X + deltaX, end.Y}, nil
 }
