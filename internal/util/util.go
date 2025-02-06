@@ -59,6 +59,19 @@ func init() {
 	Stdout = new(bytes.Buffer)
 }
 
+// SliceMap returns the slice obtained from applying the given function
+// to all elements of the argument slice. Nil values are preserved
+func SliceMap[T, V any](ts []T, f func(T) V) []V {
+	if ts == nil {
+		return nil
+	}
+    vs := make([]V, len(ts))
+    for i, t := range ts {
+        vs[i] = f(t)
+    }
+    return vs
+}
+
 // SliceEnd returns a byte slice where the index is a rune index
 // Slices off the start of the slice
 func SliceEnd(slc []byte, index int) []byte {
