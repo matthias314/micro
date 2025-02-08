@@ -254,6 +254,17 @@ func (b *Buffer) FindAllSubmatch(s string, start, end Loc) ([][]Loc, error) {
 	return matches, err
 }
 
+// MatchedStrings converts a slice containing start and end positions of
+// matches or submatches to a slice containing the corresponding strings.
+// Unused submatches are converted to empty strings.
+func (b *Buffer) MatchedStrings(locs []Loc) []string {
+	strs := make([]string, len(locs)/2)
+	for i := 0; 2*i < len(locs); i += 2 {
+		strs[i] = string(b.Substr(locs[2*i], locs[2*i+1]))
+	}
+	return strs
+}
+
 // FindNext finds the next occurrence of a given string in the buffer
 // It returns the start and end location of the match (if found) and
 // a boolean indicating if it was found
