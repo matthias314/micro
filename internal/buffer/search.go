@@ -2,7 +2,6 @@ package buffer
 
 import (
 	"regexp"
-	"unicode/utf8"
 
 	"github.com/zyedidia/micro/v2/internal/util"
 )
@@ -32,33 +31,6 @@ func NewRegexpGroup(s string) (RegexpGroup, error) {
 	return rgrp, err
 }
 
-func findLineParams(b *Buffer, start, end Loc, i int) ([]byte, int, int) {
-	l := b.LineBytes(i)
-	charpos := 0
-	padMode := 0
-
-	if i == end.Y {
-		nchars := util.CharacterCount(l)
-		end.X = util.Clamp(end.X, 0, nchars)
-		if end.X < nchars {
-			l = util.SliceStart(l, end.X+1)
-			padMode |= padEnd
-		}
-	}
-
-	if i == start.Y {
-		nchars := util.CharacterCount(l)
-		start.X = util.Clamp(start.X, 0, nchars)
-		if start.X > 0 {
-			charpos = start.X - 1
-			l = util.SliceEnd(l, charpos)
-			padMode |= padStart
-		}
-	}
-
-	return l, charpos, padMode
-}
-
 type bytesFind func(*regexp.Regexp, []byte) []int
 
 func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) []Loc {
@@ -77,22 +49,42 @@ func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) 
 	}
 
 	for i := start.Y; i <= end.Y; i++ {
-		l, charpos, padMode := findLineParams(b, start, end, i)
+		l := b.LineBytes(i)
+		from, to := 0, len(l)
+		padMode := 0
 
-		match := find(rgrp[padMode], l)
+		if i == end.Y {
+			nchars := util.CharacterCount(l)
+			end.X = util.Clamp(end.X, 0, nchars)
+			if end.X < nchars {
+				padMode |= padEnd
+				to = util.NextRunePos(l, util.BytePosFromCharPos(l, end.X))
+			}
+		}
+
+		if i == start.Y {
+			nchars := util.CharacterCount(l)
+			start.X = util.Clamp(start.X, 0, nchars)
+			if start.X > 0 {
+				padMode |= padStart
+				from = util.PreviousRunePos(l, util.BytePosFromCharPos(l, start.X))
+			}
+		}
+
+		s := l[from:to]
+		match := find(rgrp[padMode], s)
 
 		if match != nil {
 			if padMode&padStart != 0 {
-				_, size := utf8.DecodeRune(l[match[0]:])
-				match[0] += size
+				match[0] = util.NextRunePos(s, match[0])
 			}
 			if padMode&padEnd != 0 {
-				_, size := utf8.DecodeLastRune(l[:match[1]])
-				match[1] -= size
+				match[1] = util.PreviousRunePos(s, match[1])
 			}
 			return util.SliceMap(match, func(pos int) Loc {
 				if pos >= 0 {
-					return Loc{charpos + util.RunePos(l, pos), i}
+					x := util.CharacterCount(l[:from+pos])
+					return Loc{x, i}
 				} else { // unused submatches
 					return Loc{-1, -1}
 				}

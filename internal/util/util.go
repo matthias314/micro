@@ -65,11 +65,11 @@ func SliceMap[T, V any](ts []T, f func(T) V) []V {
 	if ts == nil {
 		return nil
 	}
-    vs := make([]V, len(ts))
-    for i, t := range ts {
-        vs[i] = f(t)
-    }
-    return vs
+	vs := make([]V, len(ts))
+	for i, t := range ts {
+		vs[i] = f(t)
+	}
+	return vs
 }
 
 // SliceEnd returns a byte slice where the index is a rune index
@@ -325,12 +325,6 @@ func IsBytesWhitespace(b []byte) bool {
 		}
 	}
 	return true
-}
-
-// RunePos returns the rune index of a given byte index
-// Make sure the byte index is not between code points
-func RunePos(b []byte, i int) int {
-	return CharacterCount(b[:i])
 }
 
 // IndexAnyUnquoted returns the first position in s of a character from chars.
