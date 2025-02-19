@@ -18,7 +18,8 @@ import (
 
 var minMark = rune(unicode.Mark.R16[0].Lo)
 
-func isMark(r rune) bool {
+// IsMark returns true if `rune` is a combining rune
+func IsMark(r rune) bool {
 	// Fast path
 	if r < minMark {
 		return false
@@ -34,7 +35,7 @@ func DecodeCharacter(b []byte) (rune, []rune, int) {
 	c, s := utf8.DecodeRune(b)
 
 	var combc []rune
-	for isMark(c) {
+	for IsMark(c) {
 		combc = append(combc, c)
 		size += s
 
@@ -53,7 +54,7 @@ func DecodeCharacterInString(str string) (rune, []rune, int) {
 	c, s := utf8.DecodeRuneInString(str)
 
 	var combc []rune
-	for isMark(c) {
+	for IsMark(c) {
 		combc = append(combc, c)
 		size += s
 
@@ -71,7 +72,7 @@ func CharacterCount(b []byte) int {
 
 	for len(b) > 0 {
 		r, size := utf8.DecodeRune(b)
-		if !isMark(r) {
+		if !IsMark(r) {
 			s++
 		}
 
@@ -87,7 +88,7 @@ func CharacterCountInString(str string) int {
 	s := 0
 
 	for _, r := range str {
-		if !isMark(r) {
+		if !IsMark(r) {
 			s++
 		}
 	}
