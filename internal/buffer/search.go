@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/zyedidia/micro/v2/internal/util"
 )
@@ -81,9 +82,15 @@ func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) 
 			if padMode&padEnd != 0 {
 				match[1] = util.PreviousRunePos(s, match[1])
 			}
-			return util.SliceMap(match, func(pos int) Loc {
+			return util.RangeMap(match, func(j, pos int) Loc {
 				if pos >= 0 {
 					x := util.CharacterCount(l[:from+pos])
+					if j % 2 == 0 {
+						r, _ := utf8.DecodeRune(s[pos:])
+						if util.IsMark(r) {
+							x--
+						}
+					}
 					return Loc{x, i}
 				} else { // unused submatches
 					return Loc{-1, -1}
