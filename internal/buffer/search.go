@@ -298,30 +298,32 @@ func (b *Buffer) FindNext(s string, start, end, from Loc, down bool, useRegex bo
 	}
 }
 
-// ReplaceAll replaces all matches of 's' with 'template' in the given area
-// and returns the number of replacements made, the new end position and any
-// error that occured during regexp compilation
-func (b *Buffer) ReplaceAll(s string, start, end Loc, template string) (int, Loc, error) {
+func (b *Buffer) replaceAllFuncFunc(s string, start, end Loc, find bufferFind, repl func(match []Loc) []byte) (int, Loc, error) {
 	rgrp, err := NewRegexpGroup(s)
 	if err != nil {
 		return -1, Loc{-1, -1}, err
 	}
 
-	if start.GreaterThan(end) {
-		start, end = end, start
-	}
-
-	templateBytes := []byte(template)
 	charsEnd := util.CharacterCount(b.LineBytes(end.Y))
-
 	var deltas []Delta
+
+	n := b.findAllFuncFunc(rgrp, start, end, find, func(match []Loc) {
+		deltas = append(deltas, Delta{repl(match), match[0], match[1]})
+	})
+	b.MultipleReplace(deltas)
+
+	deltaX := util.CharacterCount(b.LineBytes(end.Y)) - charsEnd
+	return n, Loc{end.X + deltaX, end.Y}, nil
+}
+
+// ReplaceAll replaces all matches of 's' with 'template' in the given area
+// and returns the number of replacements made, the new end position and any
+// error that occured during regexp compilation
+func (b *Buffer) ReplaceAll(s string, start, end Loc, template string) (int, Loc, error) {
+	templateBytes := []byte(template)
 	var replace []byte
 
-	f := func(match []Loc) {
-		deltas = append(deltas, Delta{replace, match[0], match[1]})
-	}
-
-	n := b.findAllFuncFunc(rgrp, start, end, func(b *Buffer, r RegexpGroup, start, end Loc) []Loc {
+	find := func(b *Buffer, r RegexpGroup, start, end Loc) []Loc {
 		return b.findDownFunc(r, start, end, func(re *regexp.Regexp, l []byte) []int {
 			match := re.FindSubmatchIndex(l)
 			if match == nil {
@@ -330,9 +332,36 @@ func (b *Buffer) ReplaceAll(s string, start, end Loc, template string) (int, Loc
 			replace = re.Expand(nil, templateBytes, l, match)
 			return match[:2] // this way match[2:] is not transformed to Loc's
 		})
-	}, f)
-	b.MultipleReplace(deltas)
+	}
 
-	deltaX := util.CharacterCount(b.LineBytes(end.Y)) - charsEnd
-	return n, Loc{end.X + deltaX, end.Y}, nil
+	return b.replaceAllFuncFunc(s, start, end, find, func(match []Loc) []byte {
+		return replace
+	})
+}
+
+// ReplaceAllLiteral replaces all matches of the regexp `s` with `repl` in
+// the given area. The function returns the number of replacements made, the
+// new end position and any error that occured during regexp compilation
+func (b *Buffer) ReplaceAllLiteral(s string, start, end Loc, repl []byte) (int, Loc, error) {
+	return b.ReplaceAllFunc(s, start, end, func([]Loc) []byte {
+		return repl
+	})
+}
+
+// ReplaceAllFunc replaces all matches of the regexp `s` with `repl(match)`
+// in the given area, where `match` is the slice containing start and end
+// positions of the match. The function returns the number of replacements
+// made, the new end position and any error that occured during regexp
+// compilation
+func (b *Buffer) ReplaceAllFunc(s string, start, end Loc, repl func(match []Loc) []byte) (int, Loc, error) {
+	return b.replaceAllFuncFunc(s, start, end, (*Buffer).FindDown, repl)
+}
+
+// ReplaceAllSubmatchFunc replaces all matches of the regexp `s` with
+// `repl(match)` in the given area, where `match` is the slice containing
+// start and end positions of the match and all submatches. The function
+// returns the number of replacements made, the new end position and any
+// error that occured during regexp compilation
+func (b *Buffer) ReplaceAllSubmatchFunc(s string, start, end Loc, repl func(match []Loc) []byte) (int, Loc, error) {
+	return b.replaceAllFuncFunc(s, start, end, (*Buffer).FindDownSubmatch, repl)
 }
