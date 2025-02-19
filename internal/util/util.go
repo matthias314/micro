@@ -59,15 +59,16 @@ func init() {
 	Stdout = new(bytes.Buffer)
 }
 
-// SliceMap returns the slice obtained from applying the given function
-// to all elements of the argument slice. Nil values are preserved
-func SliceMap[T, V any](ts []T, f func(T) V) []V {
+// RangeMap returns the slice obtained from applying the given function
+// to all elements of the argument slice, with the slice index as additional
+// argument. Nil values are preserved
+func RangeMap[T, V any](ts []T, f func(int, T) V) []V {
 	if ts == nil {
 		return nil
 	}
 	vs := make([]V, len(ts))
 	for i, t := range ts {
-		vs[i] = f(t)
+		vs[i] = f(i, t)
 	}
 	return vs
 }
