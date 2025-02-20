@@ -319,8 +319,7 @@ func (b *Buffer) replaceAllFuncFunc(s string, start, end Loc, find bufferFind, r
 // ReplaceAll replaces all matches of 's' with 'template' in the given area
 // and returns the number of replacements made, the new end position and any
 // error that occured during regexp compilation
-func (b *Buffer) ReplaceAll(s string, start, end Loc, template string) (int, Loc, error) {
-	templateBytes := []byte(template)
+func (b *Buffer) ReplaceAll(s string, start, end Loc, template []byte) (int, Loc, error) {
 	var replace []byte
 
 	find := func(b *Buffer, r RegexpGroup, start, end Loc) []Loc {
@@ -329,7 +328,7 @@ func (b *Buffer) ReplaceAll(s string, start, end Loc, template string) (int, Loc
 			if match == nil {
 				return nil
 			}
-			replace = re.Expand(nil, templateBytes, l, match)
+			replace = re.Expand(nil, template, l, match)
 			return match[:2] // this way match[2:] is not transformed to Loc's
 		})
 	}
