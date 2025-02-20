@@ -931,7 +931,6 @@ func (h *BufPane) ReplaceCmd(args []string) {
 
 	if noRegex {
 		search = regexp.QuoteMeta(search)
-		replaceStr = strings.ReplaceAll(replaceStr, "$", "$$")
 	}
 
 	replace := []byte(replaceStr)
@@ -952,7 +951,11 @@ func (h *BufPane) ReplaceCmd(args []string) {
 	}
 	if all {
 		var err error
-		nreplaced, _, err = h.Buf.ReplaceAll(search, start, end, replace)
+		if noRegex {
+			nreplaced, _, err = h.Buf.ReplaceAllLiteral(search, start, end, replace)
+		} else {
+			nreplaced, _, err = h.Buf.ReplaceAll(search, start, end, replace)
+		}
 		if err != nil {
 			InfoBar.Error(err)
 			return
@@ -1000,7 +1003,11 @@ func (h *BufPane) ReplaceCmd(args []string) {
 
 			InfoBar.YNPrompt("Perform replacement (y,n,esc)", func(yes, canceled bool) {
 				if !canceled && yes {
-					_, searchLoc, _ = h.Buf.ReplaceAll(search, locs[0], locs[1], replace)
+					if noRegex {
+						_, searchLoc, _ = h.Buf.ReplaceAllLiteral(search, locs[0], locs[1], replace)
+					} else {
+						_, searchLoc, _ = h.Buf.ReplaceAll(search, locs[0], locs[1], replace)
+					}
 
 					if end.Y == locs[1].Y {
 						end = buffer.Loc{end.X + searchLoc.X - locs[1].X, end.Y}
