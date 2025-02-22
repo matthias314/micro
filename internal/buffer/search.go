@@ -93,7 +93,7 @@ func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) 
 					}
 					return Loc{x, i}
 				} else { // start or end of unused submatch
-					return Loc{-1, -1}
+					return LocVoid()
 				}
 			})
 		}
@@ -113,7 +113,7 @@ func (b *Buffer) FindDown(rgrp RegexpGroup, start, end Loc) []Loc {
 // FindDownSubmatch returns a slice containing the start and end positions
 // of the first match of `rgrp` between `start` and `end` plus those
 // of all submatches (capturing groups), or nil if no match exists.
-// The start and end positions of an unused submatch are `Loc{-1, -1}`.
+// The start and end positions of an unused submatch are void.
 func (b *Buffer) FindDownSubmatch(rgrp RegexpGroup, start, end Loc) []Loc {
 	return b.findDownFunc(rgrp, start, end, (*regexp.Regexp).FindSubmatchIndex)
 }
@@ -169,7 +169,7 @@ func (b *Buffer) FindUp(rgrp RegexpGroup, start, end Loc) []Loc {
 // FindUpSubmatch returns a slice containing the start and end positions
 // of the last match of `rgrp` between `start` and `end` plus those
 // of all submatches (capturing groups), or nil if no match exists.
-// The start and end positions of an unused submatch are `Loc{-1, -1}`.
+// The start and end positions of an unused submatch are void.
 func (b *Buffer) FindUpSubmatch(rgrp RegexpGroup, start, end Loc) []Loc {
 	return b.findUpFunc(rgrp, start, end, func(re *regexp.Regexp, l []byte) []int {
 		allMatches := re.FindAllSubmatchIndex(l, -1)
@@ -259,7 +259,7 @@ func (b *Buffer) FindAllSubmatch(s string, start, end Loc) ([][]Loc, error) {
 func (b *Buffer) MatchedStrings(locs []Loc) []string {
 	strs := make([]string, len(locs)/2)
 	for i := 0; 2*i < len(locs); i += 2 {
-		if locs[2*i] != (Loc{-1, -1}) {
+		if !locs[2*i].IsVoid() {
 			strs[i] = string(b.Substr(locs[2*i], locs[2*i+1]))
 		}
 	}
@@ -310,7 +310,7 @@ func (b *Buffer) FindNext(s string, start, end, from Loc, down bool, useRegex bo
 func (b *Buffer) replaceAllFuncFunc(s string, start, end Loc, find bufferFind, repl func(match []Loc) []byte) (int, Loc, error) {
 	rgrp, err := NewRegexpGroup(s)
 	if err != nil {
-		return -1, Loc{-1, -1}, err
+		return -1, LocVoid(), err
 	}
 
 	charsEnd := util.CharacterCount(b.LineBytes(end.Y))
