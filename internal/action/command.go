@@ -971,7 +971,7 @@ func (h *BufPane) ReplaceCmd(args []string) {
 			return l.GreaterEqual(start) && l.LessEqual(end)
 		}
 
-		lastMatchEnd := buffer.Loc{-1, -1}
+		lastMatchEnd := buffer.LocVoid()
 		var doReplacement func()
 		doReplacement = func() {
 			locs := h.Buf.FindDown(rgrp, searchLoc, end)
@@ -986,7 +986,7 @@ func (h *BufPane) ReplaceCmd(args []string) {
 				// skip empty match right after previous match
 				if searchLoc == end {
 					searchLoc = start
-					lastMatchEnd = buffer.Loc{-1, -1}
+					lastMatchEnd = buffer.LocVoid()
 				} else {
 					searchLoc = searchLoc.Move(1, h.Buf)
 				}
