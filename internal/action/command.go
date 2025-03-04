@@ -974,7 +974,7 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		lastMatchEnd := buffer.LocVoid()
 		var doReplacement func()
 		doReplacement = func() {
-			locs := h.Buf.FindDown(rgrp, searchLoc, end)
+			locs, _ := h.Buf.FindDown(rgrp, searchLoc, end)
 			if locs == nil || !inRange(locs[0]) || !inRange(locs[1]) {
 				h.Cursor.ResetSelection()
 				h.Buf.RelocateCursors()
