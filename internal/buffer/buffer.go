@@ -617,7 +617,7 @@ func (b *Buffer) WordAt(loc Loc) []byte {
 		start.X--
 	}
 
-	lineLen := util.CharacterCount(b.LineBytes(loc.Y))
+	lineLen := b.LineCharacterCount(loc.Y)
 	for end.X < lineLen && util.IsWordChar(b.RuneAt(end)) {
 		end.X++
 	}
@@ -1096,20 +1096,17 @@ func (b *Buffer) MoveLinesUp(start int, end int) {
 	l := string(b.LineBytes(start - 1))
 	if end == len(b.lines) {
 		b.insert(
-			Loc{
-				util.CharacterCount(b.lines[end-1].data),
-				end - 1,
-			},
+			b.EndOfLine(end-1),
 			[]byte{'\n'},
 		)
 	}
 	b.Insert(
-		Loc{0, end},
+		b.StartOfLine(end),
 		l+"\n",
 	)
 	b.Remove(
-		Loc{0, start - 1},
-		Loc{0, start},
+		b.StartOfLine(start-1),
+		b.StartOfLine(start),
 	)
 }
 
@@ -1120,13 +1117,13 @@ func (b *Buffer) MoveLinesDown(start int, end int) {
 	}
 	l := string(b.LineBytes(end))
 	b.Insert(
-		Loc{0, start},
+		b.StartOfLine(start),
 		l+"\n",
 	)
 	end++
 	b.Remove(
-		Loc{0, end},
-		Loc{0, end + 1},
+		b.StartOfLine(end),
+		b.StartOfLine(end+1),
 	)
 }
 

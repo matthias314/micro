@@ -831,7 +831,7 @@ func (h *BufPane) GotoCmd(args []string) {
 		line = h.Buf.LinesNum() + 1 + line
 	}
 	line = util.Clamp(line-1, 0, h.Buf.LinesNum()-1)
-	col = util.Clamp(col-1, 0, util.CharacterCount(h.Buf.LineBytes(line)))
+	col = util.Clamp(col-1, 0, h.Buf.LineCharacterCount(line))
 
 	h.RemoveAllMultiCursors()
 	h.Cursor.Deselect(true)
@@ -850,7 +850,7 @@ func (h *BufPane) JumpCmd(args []string) {
 
 	line = h.Buf.GetActiveCursor().Y + 1 + line
 	line = util.Clamp(line-1, 0, h.Buf.LinesNum()-1)
-	col = util.Clamp(col-1, 0, util.CharacterCount(h.Buf.LineBytes(line)))
+	col = util.Clamp(col-1, 0, h.Buf.LineCharacterCount(line))
 
 	h.RemoveAllMultiCursors()
 	h.Cursor.Deselect(true)
