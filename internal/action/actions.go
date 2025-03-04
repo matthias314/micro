@@ -710,8 +710,7 @@ func (h *BufPane) InsertNewline() bool {
 
 		// Remove the whitespaces if keepautoindent setting is off
 		if util.IsSpacesOrTabs(h.Buf.LineBytes(h.Cursor.Y-1)) && !h.Buf.Settings["keepautoindent"].(bool) {
-			line := h.Buf.LineBytes(h.Cursor.Y - 1)
-			h.Buf.Remove(buffer.Loc{X: 0, Y: h.Cursor.Y - 1}, buffer.Loc{X: util.CharacterCount(line), Y: h.Cursor.Y - 1})
+			h.Buf.Remove(h.Buf.StartOfLine(h.Cursor.Y-1), h.Buf.EndOfLine(h.Cursor.Y-1))
 		}
 	}
 	h.Cursor.StoreVisualX()
@@ -826,7 +825,7 @@ func (h *BufPane) IndentSelection() bool {
 		indentsize := len(h.Buf.IndentString(tabsize))
 		for y := startY; y <= endY; y++ {
 			if len(h.Buf.LineBytes(y)) > 0 {
-				h.Buf.Insert(buffer.Loc{X: 0, Y: y}, h.Buf.IndentString(tabsize))
+				h.Buf.Insert(h.Buf.StartOfLine(y), h.Buf.IndentString(tabsize))
 				if y == startY && start.X > 0 {
 					h.Cursor.SetSelectionStart(start.Move(indentsize, h.Buf))
 				}
@@ -851,7 +850,7 @@ func (h *BufPane) IndentLine() bool {
 
 	tabsize := int(h.Buf.Settings["tabsize"].(float64))
 	indentstr := h.Buf.IndentString(tabsize)
-	h.Buf.Insert(buffer.Loc{X: 0, Y: h.Cursor.Y}, indentstr)
+	h.Buf.Insert(h.Buf.StartOfLine(h.Cursor.Y), indentstr)
 	h.Buf.RelocateCursors()
 	h.Relocate()
 	return true
@@ -867,7 +866,7 @@ func (h *BufPane) OutdentLine() bool {
 		if len(util.GetLeadingWhitespace(h.Buf.LineBytes(h.Cursor.Y))) == 0 {
 			break
 		}
-		h.Buf.Remove(buffer.Loc{X: 0, Y: h.Cursor.Y}, buffer.Loc{X: 1, Y: h.Cursor.Y})
+		h.Buf.Remove(h.Buf.StartOfLine(h.Cursor.Y), buffer.Loc{X: 1, Y: h.Cursor.Y})
 	}
 	h.Buf.RelocateCursors()
 	h.Relocate()
@@ -1276,7 +1275,7 @@ func (h *BufPane) DiffNext() bool {
 	if err != nil {
 		return false
 	}
-	h.GotoLoc(buffer.Loc{0, dl})
+	h.GotoLoc(h.Buf.StartOfLine(dl))
 	return true
 }
 
@@ -1287,7 +1286,7 @@ func (h *BufPane) DiffPrevious() bool {
 	if err != nil {
 		return false
 	}
-	h.GotoLoc(buffer.Loc{0, dl})
+	h.GotoLoc(h.Buf.StartOfLine(dl))
 	return true
 }
 
@@ -1323,8 +1322,8 @@ func (h *BufPane) selectLines() int {
 		}
 
 		h.Cursor.Deselect(true)
-		h.Cursor.SetSelectionStart(buffer.Loc{0, start.Y})
-		h.Cursor.SetSelectionEnd(buffer.Loc{0, end.Y + 1})
+		h.Cursor.SetSelectionStart(h.Buf.StartOfLine(start.Y))
+		h.Cursor.SetSelectionEnd(h.Buf.StartOfLine(end.Y + 1))
 	} else {
 		h.Cursor.SelectLine()
 	}
@@ -2221,10 +2220,10 @@ func (h *BufPane) SpawnMultiCursorSelect() bool {
 
 	if h.Cursor.HasSelection() {
 		h.Cursor.ResetSelection()
-		h.Cursor.GotoLoc(buffer.Loc{0, startLine})
+		h.Cursor.GotoLoc(h.Buf.StartOfLine(startLine))
 
 		for i := startLine; i <= endLine; i++ {
-			c := buffer.NewCursor(h.Buf, buffer.Loc{0, i})
+			c := buffer.NewCursor(h.Buf, h.Buf.StartOfLine(i))
 			c.StoreVisualX()
 			h.Buf.AddCursor(c)
 		}

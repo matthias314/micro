@@ -7,11 +7,7 @@ import (
 
 // InBounds returns whether the given location is a valid character position in the given buffer
 func InBounds(pos Loc, buf *Buffer) bool {
-	if pos.Y < 0 || pos.Y >= len(buf.lines) || pos.X < 0 || pos.X > util.CharacterCount(buf.LineBytes(pos.Y)) {
-		return false
-	}
-
-	return true
+	return pos == buf.Clamp(pos)
 }
 
 // The Cursor struct stores the location of the cursor in the buffer
@@ -115,7 +111,7 @@ func (c *Cursor) Start() {
 func (c *Cursor) StartOfText() {
 	c.Start()
 	for util.IsWhitespace(c.RuneUnder(c.X)) {
-		if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+		if c.IsEndOfLine() {
 			break
 		}
 		c.Right()
@@ -127,7 +123,7 @@ func (c *Cursor) StartOfText() {
 func (c *Cursor) IsStartOfText() bool {
 	x := 0
 	for util.IsWhitespace(c.RuneUnder(x)) {
-		if x == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+		if x == c.buf.LineCharacterCount(c.Y) {
 			break
 		}
 		x++
@@ -135,9 +131,13 @@ func (c *Cursor) IsStartOfText() bool {
 	return c.X == x
 }
 
+func (c *Cursor) IsEndOfLine() bool {
+	return c.buf.IsEndOfLine(Loc{c.X, c.Y})
+}
+
 // End moves the cursor to the end of the line it is on
 func (c *Cursor) End() {
-	c.X = util.CharacterCount(c.buf.LineBytes(c.Y))
+	c.X = c.buf.LineCharacterCount(c.Y)
 	c.StoreVisualX()
 }
 
@@ -304,7 +304,7 @@ func (c *Cursor) Right() {
 	if c.Loc == c.buf.End() {
 		return
 	}
-	if c.X < util.CharacterCount(c.buf.LineBytes(c.Y)) {
+	if !c.IsEndOfLine() {
 		c.X++
 	} else {
 		c.Down()
@@ -314,20 +314,11 @@ func (c *Cursor) Right() {
 }
 
 // Relocate makes sure that the cursor is inside the bounds
-// of the buffer If it isn't, it moves it to be within the
+// of the buffer. If it isn't, it moves it to be within the
 // buffer's lines
 func (c *Cursor) Relocate() {
-	if c.Y < 0 {
-		c.Y = 0
-	} else if c.Y >= len(c.buf.lines) {
-		c.Y = len(c.buf.lines) - 1
-	}
-
-	if c.X < 0 {
-		c.X = 0
-	} else if c.X > util.CharacterCount(c.buf.LineBytes(c.Y)) {
-		c.X = util.CharacterCount(c.buf.LineBytes(c.Y))
-	}
+	l := c.buf.Clamp(Loc{c.X, c.Y})
+	c.X, c.Y = l.X, l.Y
 }
 
 // SelectWord selects the word the cursor is currently on
@@ -352,7 +343,7 @@ func (c *Cursor) SelectWord() {
 	c.SetSelectionStart(Loc{backward, c.Y})
 	c.OrigSelection[0] = c.CurSelection[0]
 
-	lineLen := util.CharacterCount(c.buf.LineBytes(c.Y)) - 1
+	lineLen := c.buf.LineCharacterCount(c.Y) - 1
 	for forward < lineLen && util.IsWordChar(c.RuneUnder(forward+1)) {
 		forward++
 	}
@@ -384,7 +375,7 @@ func (c *Cursor) AddWordToSelection() {
 	if c.Loc.GreaterThan(c.OrigSelection[1]) {
 		forward := c.X
 
-		lineLen := util.CharacterCount(c.buf.LineBytes(c.Y)) - 1
+		lineLen := c.buf.LineCharacterCount(c.Y) - 1
 		for forward < lineLen && util.IsWordChar(c.RuneUnder(forward+1)) {
 			forward++
 		}
@@ -410,12 +401,12 @@ func (c *Cursor) SelectTo(loc Loc) {
 
 // WordRight moves the cursor one word to the right
 func (c *Cursor) WordRight() {
-	if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+	if c.IsEndOfLine() {
 		c.Right()
 		return
 	}
 	for util.IsWhitespace(c.RuneUnder(c.X)) {
-		if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+		if c.IsEndOfLine() {
 			return
 		}
 		c.Right()
@@ -423,7 +414,7 @@ func (c *Cursor) WordRight() {
 	if util.IsNonWordChar(c.RuneUnder(c.X)) && !util.IsWhitespace(c.RuneUnder(c.X)) &&
 		util.IsNonWordChar(c.RuneUnder(c.X+1)) {
 		for util.IsNonWordChar(c.RuneUnder(c.X)) && !util.IsWhitespace(c.RuneUnder(c.X)) {
-			if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+			if c.IsEndOfLine() {
 				return
 			}
 			c.Right()
@@ -432,7 +423,7 @@ func (c *Cursor) WordRight() {
 	}
 	c.Right()
 	for util.IsWordChar(c.RuneUnder(c.X)) {
-		if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+		if c.IsEndOfLine() {
 			return
 		}
 		c.Right()
@@ -475,13 +466,13 @@ func (c *Cursor) WordLeft() {
 
 // SubWordRight moves the cursor one sub-word to the right
 func (c *Cursor) SubWordRight() {
-	if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+	if c.IsEndOfLine() {
 		c.Right()
 		return
 	}
 	if util.IsWhitespace(c.RuneUnder(c.X)) {
 		for util.IsWhitespace(c.RuneUnder(c.X)) {
-			if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+			if c.IsEndOfLine() {
 				return
 			}
 			c.Right()
@@ -490,7 +481,7 @@ func (c *Cursor) SubWordRight() {
 	}
 	if util.IsNonWordChar(c.RuneUnder(c.X)) && !util.IsWhitespace(c.RuneUnder(c.X)) {
 		for util.IsNonWordChar(c.RuneUnder(c.X)) && !util.IsWhitespace(c.RuneUnder(c.X)) {
-			if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+			if c.IsEndOfLine() {
 				return
 			}
 			c.Right()
@@ -499,7 +490,7 @@ func (c *Cursor) SubWordRight() {
 	}
 	if util.IsSubwordDelimiter(c.RuneUnder(c.X)) {
 		for util.IsSubwordDelimiter(c.RuneUnder(c.X)) {
-			if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+			if c.IsEndOfLine() {
 				return
 			}
 			c.Right()
@@ -508,13 +499,13 @@ func (c *Cursor) SubWordRight() {
 			return
 		}
 	}
-	if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+	if c.IsEndOfLine() {
 		return
 	}
 	if util.IsUpperLetter(c.RuneUnder(c.X)) &&
 		util.IsUpperLetter(c.RuneUnder(c.X+1)) {
 		for util.IsUpperAlphanumeric(c.RuneUnder(c.X)) {
-			if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+			if c.IsEndOfLine() {
 				return
 			}
 			c.Right()
@@ -525,7 +516,7 @@ func (c *Cursor) SubWordRight() {
 	} else {
 		c.Right()
 		for util.IsLowerAlphanumeric(c.RuneUnder(c.X)) {
-			if c.X == util.CharacterCount(c.buf.LineBytes(c.Y)) {
+			if c.IsEndOfLine() {
 				return
 			}
 			c.Right()

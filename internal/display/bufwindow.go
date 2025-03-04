@@ -168,7 +168,7 @@ func (w *BufWindow) updateDisplayInfo() {
 func (w *BufWindow) getStartInfo(n, lineN int) ([]byte, int, int, *tcell.Style) {
 	tabsize := util.IntOpt(w.Buf.Settings["tabsize"])
 	width := 0
-	bloc := buffer.Loc{0, lineN}
+	bloc := w.Buf.StartOfLine(lineN)
 	b := w.Buf.LineBytes(lineN)
 	curStyle := config.DefStyle
 	var s *tcell.Style

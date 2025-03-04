@@ -35,7 +35,7 @@ func NewRegexpGroup(s string) (RegexpGroup, error) {
 type bytesFind func(*regexp.Regexp, []byte) []int
 
 func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) []Loc {
-	lastcn := util.CharacterCount(b.LineBytes(b.LinesNum() - 1))
+	lastcn := b.LineCharacterCount(b.LinesNum() - 1)
 	if start.Y > b.LinesNum()-1 {
 		start.X = lastcn - 1
 	}
@@ -55,18 +55,16 @@ func (b *Buffer) findDownFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) 
 		padMode := 0
 
 		if i == end.Y {
-			nchars := util.CharacterCount(l)
-			end.X = util.Clamp(end.X, 0, nchars)
-			if end.X < nchars {
+			end = end.Clamp(b.StartOfLine(i), b.EndOfLine(i))
+			if end != b.EndOfLine(i) {
 				padMode |= padEnd
 				to = util.NextRunePos(l, util.BytePosFromCharPos(l, end.X))
 			}
 		}
 
 		if i == start.Y {
-			nchars := util.CharacterCount(l)
-			start.X = util.Clamp(start.X, 0, nchars)
-			if start.X > 0 {
+			start = start.Clamp(b.StartOfLine(i), b.EndOfLine(i))
+			if start != b.StartOfLine(i) {
 				padMode |= padStart
 				from = util.PreviousRunePos(l, util.BytePosFromCharPos(l, start.X))
 			}
@@ -119,7 +117,7 @@ func (b *Buffer) FindDownSubmatch(rgrp RegexpGroup, start, end Loc) []Loc {
 }
 
 func (b *Buffer) findUpFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) []Loc {
-	lastcn := util.CharacterCount(b.LineBytes(b.LinesNum() - 1))
+	lastcn := b.LineCharacterCount(b.LinesNum() - 1)
 	if start.Y > b.LinesNum()-1 {
 		start.X = lastcn - 1
 	}
@@ -135,9 +133,8 @@ func (b *Buffer) findUpFunc(rgrp RegexpGroup, start, end Loc, find bytesFind) []
 
 	var locs []Loc
 	for i := end.Y; i >= start.Y; i-- {
-		charCount := util.CharacterCount(b.LineBytes(i))
-		from := Loc{0, i}.Clamp(start, end)
-		to := Loc{charCount, i}.Clamp(start, end)
+		from := b.StartOfLine(i).Clamp(start, end)
+		to := b.EndOfLine(i).Clamp(start, end)
 
 		b.findAllFuncFunc(rgrp, from, to, func(b *Buffer, rgrp RegexpGroup, start, end Loc) []Loc {
 			return b.findDownFunc(rgrp, start, end, find)
@@ -313,7 +310,7 @@ func (b *Buffer) replaceAllFuncFunc(s string, start, end Loc, find bufferFind, r
 		return -1, LocVoid(), err
 	}
 
-	charsEnd := util.CharacterCount(b.LineBytes(end.Y))
+	charsEnd := b.LineCharacterCount(end.Y)
 	var deltas []Delta
 
 	n := b.findAllFuncFunc(rgrp, start, end, find, func(match []Loc) {
@@ -321,7 +318,7 @@ func (b *Buffer) replaceAllFuncFunc(s string, start, end Loc, find bufferFind, r
 	})
 	b.MultipleReplace(deltas)
 
-	deltaX := util.CharacterCount(b.LineBytes(end.Y)) - charsEnd
+	deltaX := b.LineCharacterCount(end.Y) - charsEnd
 	return n, Loc{end.X + deltaX, end.Y}, nil
 }
 

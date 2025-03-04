@@ -318,8 +318,7 @@ func (la *LineArray) Start() Loc {
 
 // End returns the location of the last character in the buffer
 func (la *LineArray) End() Loc {
-	numlines := len(la.lines)
-	return Loc{util.CharacterCount(la.lines[numlines-1].data), numlines - 1}
+	return la.EndOfLine(la.LinesNum() - 1)
 }
 
 // LineBytes returns line n as an array of bytes
@@ -328,6 +327,35 @@ func (la *LineArray) LineBytes(lineN int) []byte {
 		return []byte{}
 	}
 	return la.lines[lineN].data
+}
+
+// LineCharacterCount returns the number of characters in the given line
+func (la *LineArray) LineCharacterCount(lineN int) int {
+	return util.CharacterCount(la.LineBytes(lineN))
+}
+
+// StartOfLine returns the start of the line as a Loc
+func (la *LineArray) StartOfLine(lineN int) Loc {
+	return Loc{0, lineN}
+}
+
+// EndOfLine returns the end of the line as a Loc
+func (la *LineArray) EndOfLine(lineN int) Loc {
+	return Loc{la.LineCharacterCount(lineN), lineN}
+}
+
+// IsEndOfLine returns true if the given location is at the end of a line
+func (la *LineArray) IsEndOfLine(l Loc) bool {
+	return l.X == la.LineCharacterCount(l.Y) // TODO: >= instead of == ?
+}
+
+// Clamp returns a valid location by first clamping the y position and then
+// the x position for that line. An x position equal to LineCharacterCount
+// for that line (i.e., right after the last character) is allowed
+func (la *LineArray) Clamp(l Loc) Loc {
+	y := util.Clamp(l.Y, 0, la.LinesNum() - 1)
+	x := util.Clamp(l.X, 0, la.LineCharacterCount(y))
+	return Loc{x, y}
 }
 
 // State gets the highlight state for the given line number
@@ -408,8 +436,8 @@ func (la *LineArray) SearchMatch(b *Buffer, pos Loc) bool {
 
 	if !s.done {
 		s.match = nil
-		start := Loc{0, lineN}
-		end := Loc{util.CharacterCount(la.lines[lineN].data), lineN}
+		start := la.StartOfLine(lineN)
+		end := la.EndOfLine(lineN)
 		for start.X < end.X {
 			m, found, _ := b.FindNext(b.LastSearch, start, end, start, true, b.LastSearchRegex)
 			if !found {
