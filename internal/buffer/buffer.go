@@ -204,9 +204,8 @@ type Buffer struct {
 	// from buffer to display, but it would require rewriting a lot of code.
 	GetVisualX func(loc Loc) int
 
-	// Last search stores the last successful search
-	LastSearch      string
-	LastSearchRegex bool
+	// LastRgrp stores the last successful search
+	LastRgrp        RegexpGroup
 	// HighlightSearch enables highlighting all instances of the last successful search
 	HighlightSearch bool
 

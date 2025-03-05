@@ -1088,22 +1088,23 @@ func (h *BufPane) FindLiteral() bool {
 // Search searches for a given string/regex in the buffer and selects the next
 // match if a match is found
 // This function behaves the same way as Find and FindLiteral actions:
-// it affects the buffer's LastSearch and LastSearchRegex (saved searches)
+// it affects the buffer's LastRgrp (saved searches)
 // for use with FindNext and FindPrevious, and turns HighlightSearch on or off
 // according to hlsearch setting
 func (h *BufPane) Search(str string, useRegex bool, searchDown bool) error {
-	match, found, err := h.Buf.FindNext(str, h.Buf.Start(), h.Buf.End(), h.Cursor.Loc, searchDown, useRegex)
+	str = h.Buf.RegexpString(str, useRegex)
+	rgrp, err := buffer.NewRegexpGroup(str)
 	if err != nil {
 		return err
 	}
-	if found {
+	match, _ := h.Buf.FindWrap(rgrp, h.Buf.Start(), h.Buf.End(), h.Cursor.Loc, searchDown)
+	if match != nil {
 		h.Cursor.SetSelectionStart(match[0])
 		h.Cursor.SetSelectionEnd(match[1])
 		h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]
 		h.Cursor.OrigSelection[1] = h.Cursor.CurSelection[1]
 		h.GotoLoc(h.Cursor.CurSelection[1])
-		h.Buf.LastSearch = str
-		h.Buf.LastSearchRegex = useRegex
+		h.Buf.LastRgrp = rgrp
 		h.Buf.HighlightSearch = h.Buf.Settings["hlsearch"].(bool)
 	} else {
 		h.Cursor.ResetSelection()
@@ -1120,8 +1121,9 @@ func (h *BufPane) find(useRegex bool) bool {
 	var eventCallback func(resp string)
 	if h.Buf.Settings["incsearch"].(bool) {
 		eventCallback = func(resp string) {
-			match, found, _ := h.Buf.FindNext(resp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true, useRegex)
-			if found {
+			resp = h.Buf.RegexpString(resp, useRegex)
+			match, err := h.Buf.FindWrap(resp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true)
+			if err == nil && match != nil {
 				h.Cursor.SetSelectionStart(match[0])
 				h.Cursor.SetSelectionEnd(match[1])
 				h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]
@@ -1136,18 +1138,19 @@ func (h *BufPane) find(useRegex bool) bool {
 	findCallback := func(resp string, canceled bool) {
 		// Finished callback
 		if !canceled {
-			match, found, err := h.Buf.FindNext(resp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true, useRegex)
+			resp = h.Buf.RegexpString(resp, useRegex)
+			rgrp, err := buffer.NewRegexpGroup(resp)
 			if err != nil {
 				InfoBar.Error(err)
 			}
-			if found {
+			match, _ := h.Buf.FindWrap(rgrp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true)
+			if match != nil {
 				h.Cursor.SetSelectionStart(match[0])
 				h.Cursor.SetSelectionEnd(match[1])
 				h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]
 				h.Cursor.OrigSelection[1] = h.Cursor.CurSelection[1]
 				h.GotoLoc(h.Cursor.CurSelection[1])
-				h.Buf.LastSearch = resp
-				h.Buf.LastSearchRegex = useRegex
+				h.Buf.LastRgrp = rgrp
 				h.Buf.HighlightSearch = h.Buf.Settings["hlsearch"].(bool)
 			} else {
 				h.Cursor.ResetSelection()
@@ -1188,8 +1191,8 @@ func (h *BufPane) UnhighlightSearch() bool {
 
 // ResetSearch resets the last used search term
 func (h *BufPane) ResetSearch() bool {
-	if h.Buf.LastSearch != "" {
-		h.Buf.LastSearch = ""
+	if h.Buf.LastRgrp[0] != nil {
+		h.Buf.LastRgrp = buffer.RegexpGroup{}
 		return true
 	}
 	return false
@@ -1197,9 +1200,6 @@ func (h *BufPane) ResetSearch() bool {
 
 // FindNext searches forwards for the last used search term
 func (h *BufPane) FindNext() bool {
-	if h.Buf.LastSearch == "" {
-		return false
-	}
 	// If the cursor is at the start of a selection and we search we want
 	// to search from the end of the selection in the case that
 	// the selection is a search result in which case we wouldn't move at
@@ -1208,19 +1208,17 @@ func (h *BufPane) FindNext() bool {
 	if h.Cursor.HasSelection() {
 		searchLoc = h.Cursor.CurSelection[1]
 	}
-	match, found, err := h.Buf.FindNext(h.Buf.LastSearch, h.Buf.Start(), h.Buf.End(), searchLoc, true, h.Buf.LastSearchRegex)
-	if err != nil {
-		InfoBar.Error(err)
-	} else if found && searchLoc == match[0] && match[0] == match[1] {
+	match, _ := h.Buf.FindWrap(h.Buf.LastRgrp, h.Buf.Start(), h.Buf.End(), searchLoc, true)
+	if match != nil && searchLoc == match[0] && match[0] == match[1] {
 		// skip empty match at present cursor location
 		if searchLoc == h.Buf.End() {
 			searchLoc = h.Buf.Start()
 		} else {
 			searchLoc = searchLoc.Move(1, h.Buf)
 		}
-		match, found, _ = h.Buf.FindNext(h.Buf.LastSearch, h.Buf.Start(), h.Buf.End(), searchLoc, true, h.Buf.LastSearchRegex)
+		match, _ = h.Buf.FindWrap(h.Buf.LastRgrp, h.Buf.Start(), h.Buf.End(), searchLoc, true)
 	}
-	if found {
+	if match != nil {
 		h.Cursor.SetSelectionStart(match[0])
 		h.Cursor.SetSelectionEnd(match[1])
 		h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]
@@ -1234,9 +1232,6 @@ func (h *BufPane) FindNext() bool {
 
 // FindPrevious searches backwards for the last used search term
 func (h *BufPane) FindPrevious() bool {
-	if h.Buf.LastSearch == "" {
-		return false
-	}
 	// If the cursor is at the end of a selection and we search we want
 	// to search from the beginning of the selection in the case that
 	// the selection is a search result in which case we wouldn't move at
@@ -1245,19 +1240,17 @@ func (h *BufPane) FindPrevious() bool {
 	if h.Cursor.HasSelection() {
 		searchLoc = h.Cursor.CurSelection[0]
 	}
-	match, found, err := h.Buf.FindNext(h.Buf.LastSearch, h.Buf.Start(), h.Buf.End(), searchLoc, false, h.Buf.LastSearchRegex)
-	if err != nil {
-		InfoBar.Error(err)
-	} else if found && searchLoc == match[0] && match[0] == match[1] {
+	match, _ := h.Buf.FindWrap(h.Buf.LastRgrp, h.Buf.Start(), h.Buf.End(), searchLoc, false)
+	if match != nil && searchLoc == match[0] && match[0] == match[1] {
 		// skip empty match at present cursor location
 		if searchLoc == h.Buf.Start() {
 			searchLoc = h.Buf.End()
 		} else {
 			searchLoc = searchLoc.Move(-1, h.Buf)
 		}
-		match, found, _ = h.Buf.FindNext(h.Buf.LastSearch, h.Buf.Start(), h.Buf.End(), searchLoc, false, h.Buf.LastSearchRegex)
+		match, _ = h.Buf.FindWrap(h.Buf.LastRgrp, h.Buf.Start(), h.Buf.End(), searchLoc, false)
 	}
-	if found {
+	if match != nil {
 		h.Cursor.SetSelectionStart(match[0])
 		h.Cursor.SetSelectionEnd(match[1])
 		h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]

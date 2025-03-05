@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -929,16 +928,14 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		}
 	}
 
-	if noRegex {
-		search = regexp.QuoteMeta(search)
+	search = h.Buf.RegexpString(search, !noRegex)
+	rgrp, err := buffer.NewRegexpGroup(search)
+	if err != nil {
+		InfoBar.Error(err)
+		return
 	}
 
 	replace := []byte(replaceStr)
-
-	if h.Buf.Settings["ignorecase"].(bool) {
-		search = "(?i)" + search
-	}
-
 	nreplaced := 0
 	start := h.Buf.Start()
 	end := h.Buf.End()
@@ -950,35 +947,19 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		searchLoc = start // otherwise me might start at the end
 	}
 	if all {
-		var err error
 		if noRegex {
-			nreplaced, _, err = h.Buf.ReplaceAllLiteral(search, start, end, replace)
+			nreplaced, _, _ = h.Buf.ReplaceAllLiteral(rgrp, start, end, replace)
 		} else {
-			nreplaced, _, err = h.Buf.ReplaceAll(search, start, end, replace)
-		}
-		if err != nil {
-			InfoBar.Error(err)
-			return
+			nreplaced, _, _ = h.Buf.ReplaceAll(rgrp, start, end, replace)
 		}
 	} else {
-		rgrp, err := buffer.NewRegexpGroup(search)
-		if err != nil {
-			InfoBar.Error(err)
-			return
-		}
-
-		inRange := func(l buffer.Loc) bool {
-			return l.GreaterEqual(start) && l.LessEqual(end)
-		}
-
 		lastMatchEnd := buffer.LocVoid()
 		var doReplacement func()
 		doReplacement = func() {
 			locs, _ := h.Buf.FindDown(rgrp, searchLoc, end)
-			if locs == nil || !inRange(locs[0]) || !inRange(locs[1]) {
+			if locs == nil {
 				h.Cursor.ResetSelection()
 				h.Buf.RelocateCursors()
-
 				return
 			}
 
@@ -997,16 +978,15 @@ func (h *BufPane) ReplaceCmd(args []string) {
 			h.Cursor.SetSelectionStart(locs[0])
 			h.Cursor.SetSelectionEnd(locs[1])
 			h.GotoLoc(locs[0])
-			h.Buf.LastSearch = search
-			h.Buf.LastSearchRegex = true
+			h.Buf.LastRgrp = rgrp
 			h.Buf.HighlightSearch = h.Buf.Settings["hlsearch"].(bool)
 
 			InfoBar.YNPrompt("Perform replacement (y,n,esc)", func(yes, canceled bool) {
 				if !canceled && yes {
 					if noRegex {
-						_, searchLoc, _ = h.Buf.ReplaceAllLiteral(search, locs[0], locs[1], replace)
+						_, searchLoc, _ = h.Buf.ReplaceAllLiteral(rgrp, locs[0], locs[1], replace)
 					} else {
-						_, searchLoc, _ = h.Buf.ReplaceAll(search, locs[0], locs[1], replace)
+						_, searchLoc, _ = h.Buf.ReplaceAll(rgrp, locs[0], locs[1], replace)
 					}
 
 					if end.Y == locs[1].Y {

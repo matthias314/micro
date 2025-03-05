@@ -44,6 +44,19 @@ func regexpGroup(re any) (RegexpGroup, error) {
 	}
 }
 
+// RegexpString converts a search string into a string that can be compiled
+// to a regexp. It can quotes special characters and switch to case-insensitive
+// search if that is the setting for the buffer.
+func (b *Buffer) RegexpString(s string, isRegexp bool) string {
+	if !isRegexp {
+		s = regexp.QuoteMeta(s)
+	}
+	if b.Settings["ignorecase"].(bool) {
+		s = "(?i)" + s
+	}
+	return s
+}
+
 type bytesFind func(*regexp.Regexp, []byte) []int
 
 func (b *Buffer) findDownFunc(re any, start, end Loc, find bytesFind) ([]Loc, error) {
@@ -282,44 +295,38 @@ func (b *Buffer) MatchedStrings(locs []Loc) []string {
 	return strs
 }
 
+// FindWrap searches for the regexp given by `re` in the region between
+// `start` and `end`. The search starts at `from` in the direction given by
+// `down`. If the beginning or end of the buffer is reached, the search wraps
+// around. The function returns the start and end positions of the first
+// match, or nil if no match exists.
+func (b *Buffer) FindWrap(re any, start, end, from Loc, down bool) ([]Loc, error) {
+	var match []Loc
+	var err error
+	if down {
+		match, err = b.FindDown(re, from, end)
+		if err == nil && match == nil {
+			match, _ = b.FindDown(re, start, from)
+		}
+	} else {
+		match, err = b.FindUp(re, start, from)
+		if err == nil && match == nil {
+			match, _ = b.FindUp(re, from, end)
+		}
+	}
+	return match, err
+}
+
 // FindNext finds the next occurrence of a given string in the buffer
 // It returns the start and end location of the match (if found) and
 // a boolean indicating if it was found
 // May also return an error if the search regex is invalid
 func (b *Buffer) FindNext(s string, start, end, from Loc, down bool, useRegex bool) ([2]Loc, bool, error) {
-	if s == "" {
-		return [2]Loc{}, false, nil
-	}
-
-	if !useRegex {
-		s = regexp.QuoteMeta(s)
-	}
-
-	if b.Settings["ignorecase"].(bool) {
-		s = "(?i)" + s
-	}
-
-	rgrp, err := NewRegexpGroup(s)
-	if err != nil {
-		return [2]Loc{}, false, err
-	}
-
-	var match []Loc
-	if down {
-		match, _ = b.FindDown(rgrp, from, end)
-		if match == nil {
-			match, _ = b.FindDown(rgrp, start, end)
-		}
-	} else {
-		match, _ = b.FindUp(rgrp, from, start)
-		if match == nil {
-			match, _ = b.FindUp(rgrp, end, start)
-		}
-	}
-	if match != nil {
+	match, err := b.FindWrap(b.RegexpString(s, useRegex), start, end, from, down)
+	if err == nil && match != nil {
 		return [2]Loc{match[0], match[1]}, true, nil
 	} else {
-		return [2]Loc{}, false, nil
+		return [2]Loc{}, false, err
 	}
 }
 

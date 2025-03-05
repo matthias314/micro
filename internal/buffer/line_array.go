@@ -34,9 +34,7 @@ func runeToByteIndex(n int, txt []byte) int {
 
 // A searchState contains the search match info for a single line
 type searchState struct {
-	search     string
-	useRegex   bool
-	ignorecase bool
+	rgrp       RegexpGroup
 	match      [][2]int
 	done       bool
 }
@@ -381,7 +379,7 @@ func (la *LineArray) Unlock() {
 // in different edit panes) which have distinct searches, so SearchMatch
 // needs to know which search to match against.
 func (la *LineArray) SearchMatch(b *Buffer, pos Loc) bool {
-	if b.LastSearch == "" {
+	if b.LastRgrp[0] == nil {
 		return false
 	}
 
@@ -398,11 +396,8 @@ func (la *LineArray) SearchMatch(b *Buffer, pos Loc) bool {
 		s = new(searchState)
 		la.lines[lineN].search[b] = s
 	}
-	if !ok || s.search != b.LastSearch || s.useRegex != b.LastSearchRegex ||
-		s.ignorecase != b.Settings["ignorecase"].(bool) {
-		s.search = b.LastSearch
-		s.useRegex = b.LastSearchRegex
-		s.ignorecase = b.Settings["ignorecase"].(bool)
+	if !ok || s.rgrp[0] != b.LastRgrp[0] {
+		s.rgrp = b.LastRgrp
 		s.done = false
 	}
 
@@ -410,19 +405,9 @@ func (la *LineArray) SearchMatch(b *Buffer, pos Loc) bool {
 		s.match = nil
 		start := Loc{0, lineN}
 		end := Loc{util.CharacterCount(la.lines[lineN].data), lineN}
-		for start.X < end.X {
-			m, found, _ := b.FindNext(b.LastSearch, start, end, start, true, b.LastSearchRegex)
-			if !found {
-				break
-			}
+		b.FindAllFunc(s.rgrp, start, end, func(m []Loc) {
 			s.match = append(s.match, [2]int{m[0].X, m[1].X})
-
-			start.X = m[1].X
-			if m[1].X == m[0].X {
-				start.X = m[1].X + 1
-			}
-		}
-
+		})
 		s.done = true
 	}
 
