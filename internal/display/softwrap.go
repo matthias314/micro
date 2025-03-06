@@ -224,7 +224,7 @@ func (w *BufWindow) getLocFromVLoc(svloc VLoc) buffer.Loc {
 }
 
 func (w *BufWindow) getRowCount(line int) int {
-	eol := buffer.Loc{X: util.CharacterCount(w.Buf.LineBytes(line)), Y: line}
+	eol := w.Buf.EndOfLine(line)
 	return w.getVLocFromLoc(eol).Row + 1
 }
 

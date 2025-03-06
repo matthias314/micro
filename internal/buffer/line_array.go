@@ -34,9 +34,7 @@ func runeToByteIndex(n int, txt []byte) int {
 
 // A searchState contains the search match info for a single line
 type searchState struct {
-	search     string
-	useRegex   bool
-	ignorecase bool
+	rgrp       RegexpGroup
 	match      [][2]int
 	done       bool
 }
@@ -318,8 +316,7 @@ func (la *LineArray) Start() Loc {
 
 // End returns the location of the last character in the buffer
 func (la *LineArray) End() Loc {
-	numlines := len(la.lines)
-	return Loc{util.CharacterCount(la.lines[numlines-1].data), numlines - 1}
+	return la.EndOfLine(la.LinesNum() - 1)
 }
 
 // LineBytes returns line n as an array of bytes
@@ -328,6 +325,35 @@ func (la *LineArray) LineBytes(lineN int) []byte {
 		return []byte{}
 	}
 	return la.lines[lineN].data
+}
+
+// LineCharacterCount returns the number of characters in the given line
+func (la *LineArray) LineCharacterCount(lineN int) int {
+	return util.CharacterCount(la.LineBytes(lineN))
+}
+
+// StartOfLine returns the start of the line as a Loc
+func (la *LineArray) StartOfLine(lineN int) Loc {
+	return Loc{0, lineN}
+}
+
+// EndOfLine returns the end of the line as a Loc
+func (la *LineArray) EndOfLine(lineN int) Loc {
+	return Loc{la.LineCharacterCount(lineN), lineN}
+}
+
+// IsEndOfLine returns true if the given location is at the end of a line
+func (la *LineArray) IsEndOfLine(l Loc) bool {
+	return l.X == la.LineCharacterCount(l.Y) // TODO: >= instead of == ?
+}
+
+// Clamp returns a valid location by first clamping the y position and then
+// the x position for that line. An x position equal to LineCharacterCount
+// for that line (i.e., right after the last character) is allowed
+func (la *LineArray) Clamp(l Loc) Loc {
+	y := util.Clamp(l.Y, 0, la.LinesNum()-1)
+	x := util.Clamp(l.X, 0, la.LineCharacterCount(y))
+	return Loc{x, y}
 }
 
 // State gets the highlight state for the given line number
@@ -381,7 +407,7 @@ func (la *LineArray) Unlock() {
 // in different edit panes) which have distinct searches, so SearchMatch
 // needs to know which search to match against.
 func (la *LineArray) SearchMatch(b *Buffer, pos Loc) bool {
-	if b.LastSearch == "" {
+	if b.LastRgrp[0] == nil {
 		return false
 	}
 
@@ -398,31 +424,16 @@ func (la *LineArray) SearchMatch(b *Buffer, pos Loc) bool {
 		s = new(searchState)
 		la.lines[lineN].search[b] = s
 	}
-	if !ok || s.search != b.LastSearch || s.useRegex != b.LastSearchRegex ||
-		s.ignorecase != b.Settings["ignorecase"].(bool) {
-		s.search = b.LastSearch
-		s.useRegex = b.LastSearchRegex
-		s.ignorecase = b.Settings["ignorecase"].(bool)
+	if !ok || s.rgrp[0] != b.LastRgrp[0] {
+		s.rgrp = b.LastRgrp
 		s.done = false
 	}
 
 	if !s.done {
 		s.match = nil
-		start := Loc{0, lineN}
-		end := Loc{util.CharacterCount(la.lines[lineN].data), lineN}
-		for start.X < end.X {
-			m, found, _ := b.FindNext(b.LastSearch, start, end, start, true, b.LastSearchRegex)
-			if !found {
-				break
-			}
+		b.FindAllFunc(s.rgrp, la.StartOfLine(lineN), la.EndOfLine(lineN), func(m []Loc) {
 			s.match = append(s.match, [2]int{m[0].X, m[1].X})
-
-			start.X = m[1].X
-			if m[1].X == m[0].X {
-				start.X = m[1].X + 1
-			}
-		}
-
+		})
 		s.done = true
 	}
 

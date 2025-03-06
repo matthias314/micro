@@ -57,8 +57,6 @@ that micro defines:
 
 * `deinit()`: cleanup function called when your plugin is unloaded or reloaded.
 
-* `onSetActive(bufpane)`: runs when changing the currently active panel.
-
 * `onBufferOpen(buf)`: runs when a buffer is opened. The input contains
    the buffer object.
 
@@ -69,7 +67,7 @@ that micro defines:
 * `onBufPaneOpen(bufpane)`: runs when a bufpane is opened. The input
    contains the bufpane object.
 
-* `onSetActive(bufpane)`: runs when changing the currently active bufpane.
+* `onSetActive(bufpane)`: runs when a bufpane becomes active.
 
 * `onAction(bufpane)`: runs when `Action` is triggered by the user, where
    `Action` is a bindable action (see `> help keybindings`). A bufpane
@@ -338,6 +336,9 @@ The packages and their contents are listed below (in Go type signatures):
 
     - `Log(s string)`: writes a string to the log buffer.
     - `LogBuf() *Buffer`: returns the log buffer.
+
+    - `NewRegexpGroup(s string)`: creates a `RegexpGroup`, which is used for
+       searching a buffer.
 
     Relevant links:
     [Message](https://pkg.go.dev/github.com/zyedidia/micro/v2/internal/buffer#Message)

@@ -204,9 +204,8 @@ type Buffer struct {
 	// from buffer to display, but it would require rewriting a lot of code.
 	GetVisualX func(loc Loc) int
 
-	// Last search stores the last successful search
-	LastSearch      string
-	LastSearchRegex bool
+	// LastRgrp stores the last successful search
+	LastRgrp        RegexpGroup
 	// HighlightSearch enables highlighting all instances of the last successful search
 	HighlightSearch bool
 
@@ -217,18 +216,18 @@ type Buffer struct {
 }
 
 // NewBufferFromFileAtLoc opens a new buffer with a given cursor location
-// If cursorLoc is {-1, -1} the location does not overwrite what the cursor location
+// If cursorLoc is void, the location does not overwrite what the cursor location
 // would otherwise be (start of file, or saved cursor position if `savecursor` is
 // enabled)
 func NewBufferFromFileAtLoc(path string, btype BufType, cursorLoc Loc) (*Buffer, error) {
 	var err error
 	filename := path
-	if config.GetGlobalOption("parsecursor").(bool) && cursorLoc.X == -1 && cursorLoc.Y == -1 {
+	if config.GetGlobalOption("parsecursor").(bool) && cursorLoc.IsVoid() {
 		var cursorPos []string
 		filename, cursorPos = util.GetPathAndCursorPosition(filename)
 		cursorLoc, err = ParseCursorLocation(cursorPos)
 		if err != nil {
-			cursorLoc = Loc{-1, -1}
+			cursorLoc = LocVoid()
 		}
 	}
 
@@ -280,7 +279,7 @@ func NewBufferFromFileAtLoc(path string, btype BufType, cursorLoc Loc) (*Buffer,
 // It will return an empty buffer if the path does not exist
 // and an error if the file is a directory
 func NewBufferFromFile(path string, btype BufType) (*Buffer, error) {
-	return NewBufferFromFileAtLoc(path, btype, Loc{-1, -1})
+	return NewBufferFromFileAtLoc(path, btype, LocVoid())
 }
 
 // NewBufferFromStringAtLoc creates a new buffer containing the given string with a cursor loc
@@ -290,7 +289,7 @@ func NewBufferFromStringAtLoc(text, path string, btype BufType, cursorLoc Loc) *
 
 // NewBufferFromString creates a new buffer containing the given string
 func NewBufferFromString(text, path string, btype BufType) *Buffer {
-	return NewBuffer(strings.NewReader(text), int64(len(text)), path, Loc{-1, -1}, btype)
+	return NewBuffer(strings.NewReader(text), int64(len(text)), path, LocVoid(), btype)
 }
 
 // NewBuffer creates a new buffer from a given reader with a given path
@@ -607,7 +606,7 @@ func (b *Buffer) WordAt(loc Loc) []byte {
 		start.X--
 	}
 
-	lineLen := util.CharacterCount(b.LineBytes(loc.Y))
+	lineLen := b.LineCharacterCount(loc.Y)
 	for end.X < lineLen && util.IsWordChar(b.RuneAt(end)) {
 		end.X++
 	}
@@ -1086,20 +1085,17 @@ func (b *Buffer) MoveLinesUp(start int, end int) {
 	l := string(b.LineBytes(start - 1))
 	if end == len(b.lines) {
 		b.insert(
-			Loc{
-				util.CharacterCount(b.lines[end-1].data),
-				end - 1,
-			},
+			b.EndOfLine(end-1),
 			[]byte{'\n'},
 		)
 	}
 	b.Insert(
-		Loc{0, end},
+		b.StartOfLine(end),
 		l+"\n",
 	)
 	b.Remove(
-		Loc{0, start - 1},
-		Loc{0, start},
+		b.StartOfLine(start-1),
+		b.StartOfLine(start),
 	)
 }
 
@@ -1110,13 +1106,13 @@ func (b *Buffer) MoveLinesDown(start int, end int) {
 	}
 	l := string(b.LineBytes(end))
 	b.Insert(
-		Loc{0, start},
+		b.StartOfLine(start),
 		l+"\n",
 	)
 	end++
 	b.Remove(
-		Loc{0, end},
-		Loc{0, end + 1},
+		b.StartOfLine(end),
+		b.StartOfLine(end+1),
 	)
 }
 

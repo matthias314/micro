@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -44,6 +43,7 @@ func InitCommands() {
 		"goto":       {(*BufPane).GotoCmd, nil},
 		"jump":       {(*BufPane).JumpCmd, nil},
 		"save":       {(*BufPane).SaveCmd, nil},
+		"insert":     {(*BufPane).InsertCmd, nil},
 		"replace":    {(*BufPane).ReplaceCmd, nil},
 		"replaceall": {(*BufPane).ReplaceAllCmd, nil},
 		"vsplit":     {(*BufPane).VSplitCmd, buffer.FileComplete},
@@ -832,7 +832,7 @@ func (h *BufPane) GotoCmd(args []string) {
 		line = h.Buf.LinesNum() + 1 + line
 	}
 	line = util.Clamp(line-1, 0, h.Buf.LinesNum()-1)
-	col = util.Clamp(col-1, 0, util.CharacterCount(h.Buf.LineBytes(line)))
+	col = util.Clamp(col-1, 0, h.Buf.LineCharacterCount(line))
 
 	h.RemoveAllMultiCursors()
 	h.Cursor.Deselect(true)
@@ -851,7 +851,7 @@ func (h *BufPane) JumpCmd(args []string) {
 
 	line = h.Buf.GetActiveCursor().Y + 1 + line
 	line = util.Clamp(line-1, 0, h.Buf.LinesNum()-1)
-	col = util.Clamp(col-1, 0, util.CharacterCount(h.Buf.LineBytes(line)))
+	col = util.Clamp(col-1, 0, h.Buf.LineCharacterCount(line))
 
 	h.RemoveAllMultiCursors()
 	h.Cursor.Deselect(true)
@@ -894,6 +894,18 @@ func (h *BufPane) SaveCmd(args []string) {
 	}
 }
 
+// InsertCmd inserts the argument into the buffer
+func (h *BufPane) InsertCmd(args []string) {
+	if len(args) == 1 {
+		for _, c := range h.Buf.GetCursors() {
+			h.Cursor = c
+			h.Insert(args[0])
+		}
+	} else {
+		InfoBar.Error("Only one argument allowed")
+	}
+}
+
 // ReplaceCmd runs search and replace
 func (h *BufPane) ReplaceCmd(args []string) {
 	if len(args) < 2 || len(args) > 4 {
@@ -929,25 +941,14 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		}
 	}
 
-	if noRegex {
-		search = regexp.QuoteMeta(search)
-	}
-
-	replace := []byte(replaceStr)
-
-	var regex *regexp.Regexp
-	var err error
-	if h.Buf.Settings["ignorecase"].(bool) {
-		regex, err = regexp.Compile("(?im)" + search)
-	} else {
-		regex, err = regexp.Compile("(?m)" + search)
-	}
+	search = h.Buf.RegexpString(search, !noRegex)
+	rgrp, err := buffer.NewRegexpGroup(search)
 	if err != nil {
-		// There was an error with the user's regex
 		InfoBar.Error(err)
 		return
 	}
 
+	replace := []byte(replaceStr)
 	nreplaced := 0
 	start := h.Buf.Start()
 	end := h.Buf.End()
@@ -959,24 +960,19 @@ func (h *BufPane) ReplaceCmd(args []string) {
 		searchLoc = start // otherwise me might start at the end
 	}
 	if all {
-		nreplaced, _ = h.Buf.ReplaceRegex(start, end, regex, replace, !noRegex)
-	} else {
-		inRange := func(l buffer.Loc) bool {
-			return l.GreaterEqual(start) && l.LessEqual(end)
+		if noRegex {
+			nreplaced, _, _ = h.Buf.ReplaceAllLiteral(rgrp, start, end, replace)
+		} else {
+			nreplaced, _, _ = h.Buf.ReplaceAll(rgrp, start, end, replace)
 		}
-
-		lastMatchEnd := buffer.Loc{-1, -1}
+	} else {
+		lastMatchEnd := buffer.LocVoid()
 		var doReplacement func()
 		doReplacement = func() {
-			locs, found, err := h.Buf.FindNext(search, start, end, searchLoc, true, true)
-			if err != nil {
-				InfoBar.Error(err)
-				return
-			}
-			if !found || !inRange(locs[0]) || !inRange(locs[1]) {
+			locs, _ := h.Buf.FindDown(rgrp, searchLoc, end)
+			if locs == nil {
 				h.Cursor.ResetSelection()
 				h.Buf.RelocateCursors()
-
 				return
 			}
 
@@ -984,7 +980,7 @@ func (h *BufPane) ReplaceCmd(args []string) {
 				// skip empty match right after previous match
 				if searchLoc == end {
 					searchLoc = start
-					lastMatchEnd = buffer.Loc{-1, -1}
+					lastMatchEnd = buffer.LocVoid()
 				} else {
 					searchLoc = searchLoc.Move(1, h.Buf)
 				}
@@ -995,18 +991,19 @@ func (h *BufPane) ReplaceCmd(args []string) {
 			h.Cursor.SetSelectionStart(locs[0])
 			h.Cursor.SetSelectionEnd(locs[1])
 			h.GotoLoc(locs[0])
-			h.Buf.LastSearch = search
-			h.Buf.LastSearchRegex = true
+			h.Buf.LastRgrp = rgrp
 			h.Buf.HighlightSearch = h.Buf.Settings["hlsearch"].(bool)
 
 			InfoBar.YNPrompt("Perform replacement (y,n,esc)", func(yes, canceled bool) {
 				if !canceled && yes {
-					_, nrunes := h.Buf.ReplaceRegex(locs[0], locs[1], regex, replace, !noRegex)
+					if noRegex {
+						_, searchLoc, _ = h.Buf.ReplaceAllLiteral(rgrp, locs[0], locs[1], replace)
+					} else {
+						_, searchLoc, _ = h.Buf.ReplaceAll(rgrp, locs[0], locs[1], replace)
+					}
 
-					searchLoc = locs[0]
-					searchLoc.X += nrunes + locs[0].Diff(locs[1], h.Buf)
 					if end.Y == locs[1].Y {
-						end = end.Move(nrunes, h.Buf)
+						end = buffer.Loc{end.X + searchLoc.X - locs[1].X, end.Y}
 					}
 					h.Cursor.Loc = searchLoc
 					nreplaced++

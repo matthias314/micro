@@ -9,6 +9,16 @@ type Loc struct {
 	X, Y int
 }
 
+// LocVoid returns a Loc strictly smaller then any valid buffer location
+func LocVoid() Loc {
+	return Loc{-1, -1}
+}
+
+// IsVoid returns true if the location l is void
+func (l Loc) IsVoid() bool {
+	return l == LocVoid()
+}
+
 // LessThan returns true if b is smaller
 func (l Loc) LessThan(b Loc) bool {
 	if l.Y < b.Y {
@@ -76,9 +86,9 @@ func DiffLA(a, b Loc, buf *LineArray) int {
 	loc := 0
 	for i := a.Y + 1; i < b.Y; i++ {
 		// + 1 for the newline
-		loc += util.CharacterCount(buf.LineBytes(i)) + 1
+		loc += buf.LineCharacterCount(i) + 1
 	}
-	loc += util.CharacterCount(buf.LineBytes(a.Y)) - a.X + b.X + 1
+	loc += buf.LineCharacterCount(a.Y) - a.X + b.X + 1
 	return loc
 }
 
@@ -88,10 +98,10 @@ func (l Loc) right(buf *LineArray) Loc {
 		return Loc{l.X + 1, l.Y}
 	}
 	var res Loc
-	if l.X < util.CharacterCount(buf.LineBytes(l.Y)) {
+	if !buf.IsEndOfLine(l) {
 		res = Loc{l.X + 1, l.Y}
 	} else {
-		res = Loc{0, l.Y + 1}
+		res = buf.StartOfLine(l.Y + 1)
 	}
 	return res
 }
@@ -105,7 +115,7 @@ func (l Loc) left(buf *LineArray) Loc {
 	if l.X > 0 {
 		res = Loc{l.X - 1, l.Y}
 	} else {
-		res = Loc{util.CharacterCount(buf.LineBytes(l.Y - 1)), l.Y - 1}
+		res = buf.EndOfLine(l.Y - 1)
 	}
 	return res
 }
